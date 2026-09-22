@@ -54,7 +54,8 @@ async function report(job_id, result, error) {
 /** 클로드 코드를 한 번 호출한다. 실패하면 에러 문자열을 던진다. */
 function runClaude(prompt) {
   return new Promise((resolve, reject) => {
-    const p = spawn("claude", ["-p", prompt], { shell: true, windowsHide: true });
+    // stdin 을 닫아야 claude 가 입력을 기다리지 않는다. 인자는 배열로 넘겨 이스케이프 문제를 피한다.
+    const p = spawn("claude", ["-p", prompt], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
     let out = "", err = "";
     const timer = setTimeout(() => { p.kill(); reject(new Error("10분을 넘겨 중단했습니다")); }, TIMEOUT_MS);
     p.stdout.on("data", (d) => (out += d));

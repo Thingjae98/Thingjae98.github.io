@@ -106,7 +106,28 @@
     go(VIEWS.some((v) => v.id === h) ? h : "chat", false);
     registerSW();
   }
+  const CHIPS = {
+    pension: [
+      ["오늘의 점검", "오늘 내 포트폴리오 이슈 체크해줘"],
+      ["보유 현황", "내 보유 ETF 지금 어때?"],
+      ["안전자산 확인", "내 위험자산 비중이 70% 한도 안에 있는지 확인해줘"],
+      ["ETF 찾기", "퇴직연금으로 살 수 있는 채권혼합형 ETF 찾아줘"],
+      ["오늘 일정", "오늘 일정 알려줘"],
+    ],
+    general: [
+      ["오늘의 점검", "오늘 내 종목 이슈 체크해줘"],
+      ["보유 현황", "내 보유 종목 지금 어때?"],
+      ["증시 뉴스", "오늘 국내외 증시 뉴스 세 줄로 요약해줘"],
+      ["종목 분석", "관심 있는 종목이 있는데 재무랑 뉴스 정리해줄래?"],
+      ["오늘 일정", "오늘 일정 알려줘"],
+    ],
+  };
+  function applyChips() {
+    const list = CHIPS[me.account_type] || CHIPS.pension;
+    $("#chips").innerHTML = list.map(([label, q]) => `<button class="chip" type="button" data-q="${esc(q)}">${esc(label)}</button>`).join("");
+  }
   function applyMe() {
+    applyChips();
     $("#side-agent").textContent = me.agent_name;
     $("#side-user").textContent = `${me.name}${me.honorific}`;
     document.title = me.agent_name;
@@ -205,29 +226,63 @@
     return `<span class="badge ${cls}">${label}</span>`;
   };
   async function loadAssets() {
+    const general = me.account_type === "general";
     const d = await api("GET", "/holdings");
+    // 계좌 종류에 따라 자산 화면의 머리말을 바꾼다
+    $("#risk-panel-title").textContent = general ? "자산 구성" : "위험자산 비중";
+    $("#risk-limit-label").textContent = general ? "" : "한도 70%";
+    $("#balance-label").textContent = general ? "계좌 총평가금액 (원)" : "퇴직연금 전체 적립금 (원)";
+    $("#risk-meter").hidden = general;
     $("#balance-input").value = d.total_balance ? fmt(d.total_balance) : "";
-    const fill = $("#risk-fill");
-    if (d.risk_ratio_pct == null) { fill.style.width = "0"; $("#risk-text").textContent = d.holdings.length ? "전체 적립금을 입력하면 비중을 계산합니다." : "보유 종목과 전체 적립금을 넣으면 비중이 보입니다."; }
-    else {
-      const pct = Math.min(100, d.risk_ratio_pct);
-      fill.style.width = pct + "%"; fill.className = "meter-fill" + (pct > 70 ? " over" : pct > 62 ? " near" : "");
-      $("#risk-text").textContent = `위험자산 ${fmt(d.risk_value)}원 · 적립금의 ${d.risk_ratio_pct}%` + (pct > 70 ? " (한도 초과, 위험자산 추가 매수는 거절됩니다)" : pct > 62 ? " (한도에 가까움)" : "");
+
+    const totalValue = d.holdings.reduce((s2, h) => s2 + (h.value || 0), 0);
+    if (general) {
+      $("#risk-text").textContent = totalValue ? `보유 종목 평가금액 합계 ${fmt(totalValue)}원` : "보유 종목을 넣으면 합계가 보입니다.";
+    } else {
+      const fill = $("#risk-fill");
+      if (d.risk_ratio_pct == null) { fill.style.width = "0"; $("#risk-text").textContent = d.holdings.length ? "전체 적립금을 입력하면 비중을 계산합니다." : "보유 종목과 전체 적립금을 넣으면 비중이 보입니다."; }
+      else {
+        const pct = Math.min(100, d.risk_ratio_pct);
+        fill.style.width = pct + "%"; fill.className = "meter-fill" + (pct > 70 ? " over" : pct > 62 ? " near" : "");
+        const safe = Math.max(0, 100 - d.risk_ratio_pct).toFixed(1);
+        $("#risk-text").textContent = `위험자산 ${fmt(d.risk_value)}원 · 적립금의 ${d.risk_ratio_pct}% (안전자산 ${safe}%)` + (pct > 70 ? " — 한도 초과, 위험자산 추가 매수는 거절됩니다" : pct > 62 ? " — 한도에 가까움" : "");
+      }
+      $("#risk-meter").setAttribute("aria-label", `위험자산 비중 ${d.risk_ratio_pct ?? 0}퍼센트, 한도 70퍼센트`);
     }
-    $("#risk-meter").setAttribute("aria-label", `위험자산 비중 ${d.risk_ratio_pct ?? 0}퍼센트, 한도 70퍼센트`);
+
     const hl = $("#holdings-list");
     hl.innerHTML = d.holdings.length ? d.holdings.map((h) => {
       const pl = h.avg_price && h.price ? ((h.price - h.avg_price) / h.avg_price) * 100 : null;
-      return `<div class="item"><div class="item-main"><div class="item-title">${esc(h.name)}</div><div class="item-sub">${fmt(h.qty)}주${h.avg_price ? ` · 평단 ${fmt(h.avg_price)}원` : ""}</div></div>
+      const share = totalValue && h.value ? ((h.value / totalValue) * 100).toFixed(1) + "%" : null;
+      return `<div class="item"><div class="item-main"><div class="item-title">${esc(h.name)}</div><div class="item-sub">${fmt(h.qty)}주${h.avg_price ? ` · 평단 ${fmt(h.avg_price)}원` : ""}${share ? ` · 비중 ${share}` : ""}</div></div>
         <div class="item-num"><div>${fmt(h.value)}원</div>${pl != null ? `<div class="item-sub ${pl >= 0 ? "up" : "down"}">${pl >= 0 ? "+" : ""}${pl.toFixed(1)}%</div>` : ""}</div>
         <button class="del" type="button" data-del-holding="${h.id}" aria-label="${esc(h.name)} 삭제"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>`;
     }).join("") : `<div class="empty-row">아직 등록된 종목이 없습니다.</div>`;
     $("#holdings-updated").textContent = d.holdings.length ? "현재가 기준" : "";
+
     const { trades } = await api("GET", "/trades");
     $("#trades-list").innerHTML = trades.length ? trades.map((t) => `<div class="item"><div class="item-main"><div class="item-title">${t.side === "buy" ? "매수" : "매도"} · ${esc(t.name)}</div><div class="item-sub">${t.trade_date} · ${fmt(t.qty)}주 × ${fmt(t.price)}원${t.reason ? ` · ${esc(t.reason)}` : ""}${t.target_price ? ` · 목표 ${fmt(t.target_price)}` : ""}${t.stop_price ? ` · 손절 ${fmt(t.stop_price)}` : ""}</div></div>
       <button class="del" type="button" data-del-trade="${t.id}" aria-label="기록 삭제"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>`).join("")
       : `<div class="empty-row">매수·매도하신 것을 대화로 말씀하시면 여기 기록됩니다.</div>`;
   }
+
+  $("#holdings-image").addEventListener("change", async (e) => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    let img;
+    try { img = await shrinkImage(f); } catch { return toast("사진을 읽지 못했습니다."); }
+    toast("사진을 읽고 있습니다. 잠시만 기다려 주세요.", 8000);
+    try {
+      const r = await api("POST", "/chat", {
+        text: "이 사진은 제 보유 종목 목록입니다. 종목명과 수량 또는 비중을 읽어서 보유 목록에 전부 등록해 주세요. 수량이 없고 비중(%)만 있으면 비중을 알려주고 수량은 넣지 마세요.",
+        image: { mimeType: img.mimeType, data: img.data },
+      });
+      chatLoaded = false;
+      toast("등록했습니다. 대화 탭에서 내용을 확인하세요.", 6000);
+      loadAssets();
+      if (r.reply) alert(r.reply.slice(0, 500));
+    } catch (ex) { toast(ex.message); }
+  });
   $("#balance-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const n = Number($("#balance-input").value.replace(/[^\d]/g, ""));
