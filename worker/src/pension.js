@@ -86,3 +86,28 @@ export function pensionRuleText(accountType = "pension") {
     "세금·연금 답변에는 항상 '세무사나 증권사에 최종 확인'을 붙일 것.",
   ].join("\n");
 }
+
+const ASSET_LABEL = { "0101": "주식", "0102": "채권", "0103": "부동산", "0104": "멀티에셋", "0105": "원자재", "0106": "통화", "0107": "변동성", "0108": "단기자금", "0109": "가상자산" };
+
+/** ETF 검색. 이름·운용사·자산군으로 찾고 순자산 큰 순으로 돌려준다. */
+export function searchEtf({ query = "", pensionOnly = false, safeOnly = false, asset = null, limit = 12 }) {
+  const words = String(query).trim().split(/\s+/).filter(Boolean);
+  const hits = [];
+  for (const [code, v] of Object.entries(rules)) {
+    if (pensionOnly && v.reti === "0") continue;
+    if (safeOnly && v.reti !== "100") continue;
+    if (asset && v.a !== asset) continue;
+    const hay = `${v.name} ${v.issuer} ${ASSET_LABEL[v.a] || ""}`;
+    if (words.length && !words.every((w) => hay.includes(w))) continue;
+    hits.push({
+      code, 종목명: v.name, 운용사: v.issuer,
+      자산군: ASSET_LABEL[v.a] || null,
+      퇴직연금: v.reti === "0" ? "불가" : v.reti + "%",
+      추정: v.est ? true : undefined,
+      순자산_억원: v.nav ?? null, 총보수_퍼센트: v.fee ?? null, "1년수익률": v.y1 ?? null,
+    });
+  }
+  hits.sort((a, b) => (b.순자산_억원 || 0) - (a.순자산_억원 || 0));
+  return { total: hits.length, results: hits.slice(0, Math.min(limit, 25)),
+    note: "순자산 큰 순입니다. '추정'은 운용사가 비율을 공시하지 않아 자산군으로 추정한 것이니 증권사 앱에서 확인이 필요합니다." };
+}

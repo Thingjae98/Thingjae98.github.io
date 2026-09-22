@@ -1,5 +1,5 @@
 import { chat as geminiChat } from "./gemini.js";
-import { checkPension, riskRatio, pensionRuleText } from "./pension.js";
+import { checkPension, riskRatio, pensionRuleText, searchEtf } from "./pension.js";
 import { searchSymbol, getQuote } from "./quotes.js";
 import { sendPush } from "./push.js";
 import { getFinance, getKeyMetrics } from "./finance.js";
@@ -130,6 +130,10 @@ function makeToolRunner(user, env, ctx = {}) {
         ctx.job_id = r.meta.last_row_id;
         return { queued: true, job_id: r.meta.last_row_id, note: "시간이 걸리는 작업이라 뒤에서 처리합니다. 사용자에게 '준비되면 알려드리겠습니다' 정도로 한 줄만 답하세요. 결과를 지어내지 마세요." };
       }
+      case "search_etf": return searchEtf({
+        query: a.query || "", pensionOnly: user.account_type !== "general" ? a.pension_only !== false : false,
+        safeOnly: !!a.safe_only, asset: a.asset || null, limit: a.limit || 12,
+      });
       case "make_document": ctx.document = a; return { ok: true, note: "화면에서 파일로 만들어 사용자에게 내려줍니다. 답변에는 무엇을 만들었는지 한 줄만 적으세요." };
       default: throw new Error("unknown tool " + name);
     }

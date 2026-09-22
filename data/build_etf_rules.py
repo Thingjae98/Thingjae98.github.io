@@ -67,6 +67,10 @@ def load_etfcheck():
             "asset": assets.get(code),
             "scale": r.get("SCALE"),
             "pension_ok": code in pension_ok,
+            "nav": r.get("F15028"),      # 순자산총액(원)
+            "fee": r.get("F34763"),      # 총보수(%)
+            "y1y": r.get("YLD_1Y"),      # 1년 수익률
+            "y3m": r.get("YLD_3M"),
         }
     return out
 
@@ -186,7 +190,16 @@ def main():
             # 공시가 없으면 보수적으로: 채권·단기자금·멀티에셋이고 이름에 위험 신호가 없을 때만 100%
             safe = v["asset"] in SAFE_ASSETS and not RISKY_NAME.search(v["name"])
             reti, est = ("100" if safe else "70"), True
+        def num(x):
+            try: return float(str(x).replace(",", ""))
+            except Exception: return None
+        nav_v = num(v.get("nav")); fee_v = num(v.get("fee")); y1_v = num(v.get("y1y"))
+        nav_eok = round(nav_v / 1e8) if nav_v else None
         out[code] = {"name": v["name"], "issuer": v["issuer"], "reti": reti}
+        if v.get("asset"): out[code]["a"] = v["asset"]
+        if nav_eok: out[code]["nav"] = nav_eok              # 억 원
+        if fee_v is not None: out[code]["fee"] = fee_v
+        if y1_v is not None: out[code]["y1"] = round(y1_v, 1)
         if est:
             out[code]["est"] = 1
             stat["추정"] += 1
