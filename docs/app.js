@@ -144,7 +144,11 @@
     if (!messages.length) {
       log.innerHTML = `<div class="empty"><strong>${esc(me.name)}${esc(me.honorific)}, 안녕하세요.</strong>종목 이름을 말씀하시면 현재가와 퇴직연금 계좌로 살 수 있는지 바로 알려드립니다. 아래 버튼을 눌러 시작해도 됩니다.</div>`;
     }
-    for (const m of messages) addMsg(m.role, m.content, { time: timeLabel(m.created_at) });
+    for (const m of messages) {
+      let doc = null;
+      if (m.document) { try { doc = JSON.parse(m.document); } catch {} }
+      addMsg(m.role, m.content, { time: timeLabel(m.created_at), document: doc });
+    }
     chatLoaded = true;
   }
   const input = $("#chat-input");
@@ -263,6 +267,9 @@
     preset.value = found ? me.tone : "custom"; $("#s-tone").value = me.tone; $("#s-tone-custom-wrap").hidden = preset.value !== "custom";
     $("#s-handle").textContent = me.handle; $("#s-api").textContent = API.replace(/^https?:\/\//, "");
     $("#push-toggle").setAttribute("aria-checked", me.push_enabled ? "true" : "false");
+    $("#brief-toggle").setAttribute("aria-checked", me.brief_enabled ? "true" : "false");
+    $("#brief-hour").value = String(me.brief_hour ?? 8);
+    $("#brief-hour-wrap").hidden = !me.brief_enabled;
     $("#push-status").textContent = !("PushManager" in window) ? "이 브라우저는 알림을 지원하지 않습니다. 홈 화면에 추가한 뒤 열어보세요." : Notification.permission === "denied" ? "브라우저에서 알림이 차단되어 있습니다. 설정에서 허용해 주세요." : "";
     $("#install-btn").hidden = !deferredInstall;
     const { memories } = await api("GET", "/memories");
@@ -298,6 +305,18 @@
       }
     } catch (ex) { toast(ex.message); }
     loadSettings();
+  });
+  $("#brief-toggle").addEventListener("click", async () => {
+    const on = $("#brief-toggle").getAttribute("aria-checked") !== "true";
+    if (on && !me.push_enabled) return toast("먼저 위의 일정 알림을 켜주세요. 알림 권한이 필요합니다.");
+    try {
+      me = await api("PATCH", "/me", { brief_enabled: on });
+      toast(on ? `매일 아침 ${$("#brief-hour").value}시에 보내드립니다.` : "아침 브리핑을 껐습니다.");
+    } catch (ex) { toast(ex.message); }
+    loadSettings();
+  });
+  $("#brief-hour").addEventListener("change", async (e) => {
+    try { me = await api("PATCH", "/me", { brief_hour: Number(e.target.value) }); toast(`아침 ${e.target.value}시로 바꿨습니다.`); } catch (ex) { toast(ex.message); }
   });
   $("#push-test").addEventListener("click", async (e) => {
     busy(e.currentTarget, true);
@@ -386,7 +405,10 @@
     $("#doc-dialog").showModal();
   }
   $("#doc-close").addEventListener("click", () => $("#doc-dialog").close());
-  $("#doc-pdf").addEventListener("click", () => window.print());
+  $("#doc-pdf").addEventListener("click", () => {
+    toast("인쇄 창이 열리면 '대상'을 'PDF로 저장'으로 고르세요.", 7000);
+    setTimeout(() => window.print(), 600);
+  });
   $("#doc-pptx").addEventListener("click", async (e) => {
     const btn = e.currentTarget; busy(btn, true);
     try { await makePptx(currentDoc); } catch (ex) { toast("발표자료를 만들지 못했습니다. " + (ex.message || ex)); } finally { busy(btn, false); }
@@ -432,7 +454,7 @@
     }
     const blob = await P.write({ outputType: "blob" });
     saveBlob(blob, (doc.title || "발표자료").replace(/[\\/:*?"<>|]/g, "").slice(0, 60) + ".pptx");
-    toast("발표자료를 내려받았습니다.");
+    toast("발표자료를 저장했습니다. 폰은 다운로드 폴더, PC는 다운로드 창에서 열어보세요.", 7000);
   }
 
   // ---------- 시작 ----------

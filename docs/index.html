@@ -212,6 +212,19 @@
             </div>
             <button id="push-toggle" class="switch" type="button" role="switch" aria-checked="false" aria-label="일정 알림"><span class="knob"></span></button>
           </div>
+          <div class="switch-row">
+            <div>
+              <div class="switch-title">아침 브리핑 받기</div>
+              <div class="muted small">보유 종목 등락과 오늘 일정을 하루 한 번 정리해 보냅니다.</div>
+            </div>
+            <button id="brief-toggle" class="switch" type="button" role="switch" aria-checked="false" aria-label="아침 브리핑"><span class="knob"></span></button>
+          </div>
+          <label class="field" id="brief-hour-wrap" hidden><span>보내는 시각</span>
+            <select id="brief-hour">
+              <option value="7">아침 7시</option><option value="8" selected>아침 8시</option>
+              <option value="9">아침 9시</option><option value="10">오전 10시</option><option value="11">오전 11시</option>
+            </select>
+          </label>
           <div class="btn-row">
             <button id="push-test" class="btn secondary" type="button">알림 테스트</button>
             <button id="install-btn" class="btn secondary" type="button" hidden>홈 화면에 추가</button>

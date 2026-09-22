@@ -3,6 +3,8 @@ import { checkPension, riskRatio, pensionRuleText } from "./pension.js";
 import { searchSymbol, getQuote } from "./quotes.js";
 import { sendPush } from "./push.js";
 import { getFinance, getKeyMetrics } from "./finance.js";
+import { analyzeStyle, riskProfile } from "./profile.js";
+import { buildBrief } from "./brief.js";
 
 const QUIET_FROM = 22, QUIET_TO = 7, DAILY_PUSH_CAP = 10, SESSION_DAYS = 30;
 
@@ -104,6 +106,18 @@ function makeToolRunner(user, env, ctx = {}) {
         ]);
         return { financials: fin, key_metrics: met };
       }
+      case "my_style": {
+        const rows = (await db.prepare("SELECT trade_date, code, name, side, qty, price, target_price, stop_price FROM trades WHERE user_id=? ORDER BY trade_date, id").bind(user.id).all()).results;
+        return analyzeStyle(rows);
+      }
+      case "risk_profile": {
+        const sym = await resolveSymbol(a.query);
+        const [rp, q] = await Promise.all([
+          riskProfile(sym.code).catch((e) => ({ error: String(e.message || e) })),
+          quoteWithPension(a.query, env, user.account_type).catch(() => null),
+        ]);
+        return { quote: q, risk: rp };
+      }
       case "make_document": ctx.document = a; return { ok: true, note: "화면에서 파일로 만들어 사용자에게 내려줍니다. 답변에는 무엇을 만들었는지 한 줄만 적으세요." };
       default: throw new Error("unknown tool " + name);
     }
@@ -153,6 +167,9 @@ async function buildSystem(user, env) {
     "- 일정을 말하면 add_event 로 저장하고 알림 시각을 확인해 준다.",
     "- 증권사 앱 캡처 이미지를 받으면 종목·수량·평단·평가금액을 읽어 정리하고, 보유 목록에 반영할지 묻는다.",
     "- 기업 분석·보고서를 요청받으면 get_financials 로 실제 재무 숫자를 먼저 가져온다. 숫자는 가져온 값만 쓰고 추정하지 않는다. 최신 소식은 구글 검색으로 보완한다.",
+    "- '이 종목 어때', '안전한가', '오래 들고 갈까 짧게 볼까', '나한테 맞나' 류의 질문에는 my_style 과 risk_profile 을 함께 불러 본인 매매 습관과 종목 성격을 대조해 답한다. 예: '평소 2주쯤 들고 계시는데 이 종목은 변동성이 높아 그 기간에 손실 폭이 커질 수 있습니다.'",
+    "- 주가가 오를지 내릴지는 단정하지 않는다. 증권사 목표주가 컨센서스는 '애널리스트 평균은 이렇다'고 인용만 하고, 맞는다는 보장이 없다고 덧붙인다.",
+    "- 매매 기록이 적어 성향이 안 나오면 솔직히 말하고, 매매하실 때 말씀해 주시면 쌓인다고 안내한다.",
     "- '보고서로 만들어줘', 'PDF로', '발표자료로', 'PPT로' 같은 요청에는 make_document 를 부른다. 내용을 먼저 조사한 뒤 마지막에 부른다. 답변에는 무엇을 만들었는지 한 줄만 쓴다.",
     "- 답은 짧게. 표가 필요하면 마크다운 표. 이모지는 쓰지 않는다.",
     "",
@@ -165,7 +182,33 @@ async function buildSystem(user, env) {
   ].join("\n");
 }
 
-const pub = (u) => ({ id: u.id, handle: u.handle, name: u.name, agent_name: u.agent_name, honorific: u.honorific, tone: u.tone, push_enabled: !!u.push_enabled, total_balance: u.total_balance, is_admin: !!u.is_admin, account_type: u.account_type || 'pension' });
+// 아침 브리핑: 켠 사람에게 하루 1회, 설정한 시각(한국시간)에
+async function runMorningBrief(env, hour, now) {
+  const today = now.slice(0, 10);
+  const users = (await env.DB.prepare("SELECT * FROM users WHERE brief_enabled=1 AND push_enabled=1 AND brief_hour=? AND (brief_last IS NULL OR brief_last<>?)").bind(hour, today).all()).results;
+  for (const u of users) {
+    await env.DB.prepare("UPDATE users SET brief_last=? WHERE id=?").bind(today, u.id).run(); // 먼저 표시해 중복 발송을 막는다
+    try {
+      const subs = (await env.DB.prepare("SELECT * FROM push_subs WHERE user_id=?").bind(u.id).all()).results;
+      if (!subs.length) continue;
+      const holdings = (await env.DB.prepare("SELECT code, name, qty FROM holdings WHERE user_id=?").bind(u.id).all()).results;
+      const events = (await upcomingEvents(u.id, 1, env)).filter((e) => e.at.slice(0, 10) === today);
+      const brief = await buildBrief(u, env, { holdings, events });
+      if (!brief) continue;
+      for (const sb of subs) {
+        const r = await sendPush(sb, { title: `${u.agent_name} 아침 브리핑`, body: brief.text.slice(0, 300), url: "/#chat" }, env);
+        if (r.gone) await env.DB.prepare("DELETE FROM push_subs WHERE id=?").bind(sb.id).run();
+      }
+      await env.DB.batch([
+        env.DB.prepare("INSERT INTO messages (user_id, role, content, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(u.id, "model", [brief.text, brief.detail].join("\n\n")),
+        env.DB.prepare("INSERT INTO push_log (user_id, title, sent_at) VALUES (?,?,datetime('now','+9 hours'))").bind(u.id, "아침 브리핑"),
+        env.DB.prepare("INSERT INTO usage_log (user_id, in_tokens, out_tokens, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(u.id, brief.usage.in, brief.usage.out),
+      ]);
+    } catch (e) { /* 한 사람 실패가 다른 사람을 막지 않는다 */ }
+  }
+}
+
+const pub = (u) => ({ id: u.id, handle: u.handle, name: u.name, agent_name: u.agent_name, honorific: u.honorific, tone: u.tone, push_enabled: !!u.push_enabled, total_balance: u.total_balance, is_admin: !!u.is_admin, account_type: u.account_type || 'pension', brief_enabled: !!u.brief_enabled, brief_hour: u.brief_hour ?? 8 });
 
 async function newSession(u, env) {
   const token = hex(crypto.getRandomValues(new Uint8Array(32)));
@@ -188,7 +231,7 @@ async function handleChat(user, body, env) {
   const r = await geminiChat({ system, history: hist, userParts, runTool: makeToolRunner(user, env, ctx), env });
   await env.DB.batch([
     env.DB.prepare("INSERT INTO messages (user_id, role, content, has_image, created_at) VALUES (?,?,?,?,datetime('now','+9 hours'))").bind(user.id, "user", text || "(이미지)", image ? 1 : 0),
-    env.DB.prepare("INSERT INTO messages (user_id, role, content, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(user.id, "model", r.text),
+    env.DB.prepare("INSERT INTO messages (user_id, role, content, document, created_at) VALUES (?,?,?,?,datetime('now','+9 hours'))").bind(user.id, "model", r.text, ctx.document ? JSON.stringify(ctx.document) : null),
     env.DB.prepare("INSERT INTO usage_log (user_id, in_tokens, out_tokens, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(user.id, r.usage.in, r.usage.out),
   ]);
   return { reply: r.text, tools: r.calls, document: ctx.document || null };
@@ -228,9 +271,9 @@ export default {
 
       if (p === "/me" && req.method === "GET") return json(pub(user), 200, origin);
       if (p === "/me" && req.method === "PATCH") {
-        const allowed = ["agent_name", "honorific", "tone", "push_enabled", "total_balance", "name"];
+        const allowed = ["agent_name", "honorific", "tone", "push_enabled", "total_balance", "name", "brief_enabled", "brief_hour"];
         const sets = [], vals = [];
-        for (const k of allowed) if (k in body) { sets.push(`${k}=?`); vals.push(k === "push_enabled" ? (body[k] ? 1 : 0) : body[k]); }
+        for (const k of allowed) if (k in body) { sets.push(`${k}=?`); vals.push(k === "push_enabled" || k === "brief_enabled" ? (body[k] ? 1 : 0) : body[k]); }
         if (sets.length) await db.prepare(`UPDATE users SET ${sets.join(",")} WHERE id=?`).bind(...vals, user.id).run();
         return json(pub(await db.prepare("SELECT * FROM users WHERE id=?").bind(user.id).first()), 200, origin);
       }
@@ -239,7 +282,7 @@ export default {
       if (p === "/chat" && req.method === "POST") return json(await handleChat(user, body, env), 200, origin);
       if (p === "/messages" && req.method === "GET") {
         const before = Number(url.searchParams.get("before") || 0) || Number.MAX_SAFE_INTEGER;
-        const rows = (await db.prepare("SELECT id, role, content, has_image, created_at FROM messages WHERE user_id=? AND id<? ORDER BY id DESC LIMIT 40").bind(user.id, before).all()).results.reverse();
+        const rows = (await db.prepare("SELECT id, role, content, has_image, document, created_at FROM messages WHERE user_id=? AND id<? ORDER BY id DESC LIMIT 40").bind(user.id, before).all()).results.reverse();
         return json({ messages: rows }, 200, origin);
       }
       if (p === "/messages" && req.method === "DELETE") { await db.prepare("DELETE FROM messages WHERE user_id=?").bind(user.id).run(); return json({ ok: true }, 200, origin); }
@@ -333,11 +376,12 @@ export default {
     }
   },
 
-  // 매분: 다가오는 일정 알림. 야간 무음 22~07시, 사용자별 하루 10건 상한, push_enabled 사용자만
+  // 매분: 다가오는 일정 알림 + 아침 브리핑. 야간 무음 22~07시, 사용자별 하루 10건 상한, push_enabled 사용자만
   async scheduled(_ev, env) {
     const h = kst().getUTCHours();
     if (h >= QUIET_FROM || h < QUIET_TO) return;
     const now = kstStr();
+    await runMorningBrief(env, h, now);
     const users = (await env.DB.prepare("SELECT * FROM users WHERE push_enabled=1").all()).results;
     for (const u of users) {
       const sentToday = (await env.DB.prepare("SELECT COUNT(*) c FROM push_log WHERE user_id=? AND sent_at >= date('now','+9 hours')").bind(u.id).first()).c;

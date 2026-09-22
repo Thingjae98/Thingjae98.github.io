@@ -13,6 +13,8 @@ export const TOOL_DECLS = [
   { name: "list_events", description: "다가오는 일정을 가져온다.", parameters: { type: "OBJECT", properties: { days: { type: "INTEGER", description: "며칠치, 기본 7" } } } },
   { name: "delete_event", description: "일정을 삭제한다.", parameters: { type: "OBJECT", properties: { id: { type: "INTEGER" } }, required: ["id"] } },
   { name: "save_memory", description: "사용자가 말한 투자 원칙·선호·관심사처럼 다음 대화에도 기억해야 할 사실을 한 줄로 저장한다.", parameters: { type: "OBJECT", properties: { content: { type: "STRING" } }, required: ["content"] } },
+  { name: "my_style", description: "사용자의 매매일지를 분석해 투자 성향(평균 보유기간, 매매 주기, 승률, 평균 손익, 목표가·손절선을 세우는 비율)을 가져온다. '나한테 맞는지', '장기로 들까 단기로 들까', '내 매매 습관' 같은 질문에 반드시 먼저 부른다.", parameters: { type: "OBJECT", properties: {} } },
+  { name: "risk_profile", description: "종목의 위험 성격(최근 변동성, 최대 낙폭, 증권사 목표주가 컨센서스)을 가져온다. 종목이 안전한지, 오래 들고 갈 만한지 물을 때 my_style 과 함께 부른다.", parameters: { type: "OBJECT", properties: { query: { type: "STRING", description: "종목명 또는 6자리 코드" } }, required: ["query"] } },
   { name: "get_financials", description: "기업의 재무제표(매출액·영업이익·순이익·ROE·부채비율·EPS·PER·PBR·주당배당금)와 시가총액·52주 최고저 같은 투자지표를 가져온다. 기업 분석이나 보고서를 쓸 때 반드시 먼저 부른다. ETF는 재무제표가 없다.", parameters: { type: "OBJECT", properties: { query: { type: "STRING", description: "종목명 또는 6자리 코드" }, period: { type: "STRING", enum: ["annual", "quarter"], description: "연간(기본) 또는 분기" } }, required: ["query"] } },
   {
     name: "make_document",
