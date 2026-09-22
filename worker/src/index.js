@@ -41,12 +41,13 @@ async function quoteWithPension(query, env, accountType = "pension") {
 }
 
 async function holdingsWithPrices(user, env) {
-  const rows = (await env.DB.prepare("SELECT id, code, name, qty, avg_price FROM holdings WHERE user_id=? ORDER BY id").bind(user.id).all()).results;
+  const rows = (await env.DB.prepare("SELECT id, code, name, qty, avg_price, weight_pct FROM holdings WHERE user_id=? ORDER BY id").bind(user.id).all()).results;
   const priced = [];
   for (const h of rows) {
     let price = h.avg_price;
     if (h.code) { try { price = (await getQuote(h.code, env)).price; } catch {} }
-    priced.push({ ...h, price, value: price ? price * h.qty : null });
+    const value = h.qty && price ? price * h.qty : (h.weight_pct && user.total_balance ? Math.round((h.weight_pct / 100) * user.total_balance) : null);
+    priced.push({ ...h, price, value });
   }
   const rr = riskRatio(priced, user.total_balance);
   return { holdings: priced, total_balance: user.total_balance, risk_value: rr.risk, risk_ratio_pct: rr.ratio };
@@ -68,11 +69,16 @@ function makeToolRunner(user, env, ctx = {}) {
       case "set_holding": {
         const s = await resolveSymbol(a.query);
         const q = await getQuote(s.code, env).catch(() => ({ code: s.code, name: s.name || a.query }));
-        if (a.qty <= 0) { await db.prepare("DELETE FROM holdings WHERE user_id=? AND code=?").bind(user.id, q.code).run(); return { deleted: q.name }; }
+        const hasQty = a.qty != null && a.qty > 0;
+        const hasWeight = a.weight_pct != null && a.weight_pct > 0;
+        if (!hasQty && !hasWeight && a.qty === 0) { await db.prepare("DELETE FROM holdings WHERE user_id=? AND code=?").bind(user.id, q.code).run(); return { deleted: q.name }; }
+        if (!hasQty && !hasWeight) throw new Error("수량이나 비중(%) 중 하나는 있어야 합니다");
         const ex = await db.prepare("SELECT id FROM holdings WHERE user_id=? AND code=?").bind(user.id, q.code).first();
-        if (ex) await db.prepare("UPDATE holdings SET qty=?, avg_price=COALESCE(?, avg_price), updated_at=datetime('now','+9 hours') WHERE id=?").bind(a.qty, a.avg_price ?? null, ex.id).run();
-        else await db.prepare("INSERT INTO holdings (user_id, code, name, qty, avg_price, updated_at) VALUES (?,?,?,?,?,datetime('now','+9 hours'))").bind(user.id, q.code, q.name, a.qty, a.avg_price ?? null).run();
-        return { saved: { code: q.code, name: q.name, qty: a.qty, avg_price: a.avg_price ?? null } };
+        if (ex) await db.prepare("UPDATE holdings SET qty=COALESCE(?, qty), avg_price=COALESCE(?, avg_price), weight_pct=COALESCE(?, weight_pct), updated_at=datetime('now','+9 hours') WHERE id=?")
+          .bind(hasQty ? a.qty : null, a.avg_price ?? null, hasWeight ? a.weight_pct : null, ex.id).run();
+        else await db.prepare("INSERT INTO holdings (user_id, code, name, qty, avg_price, weight_pct, updated_at) VALUES (?,?,?,?,?,?,datetime('now','+9 hours'))")
+          .bind(user.id, q.code, q.name, hasQty ? a.qty : null, a.avg_price ?? null, hasWeight ? a.weight_pct : null).run();
+        return { saved: { code: q.code, name: q.name, qty: hasQty ? a.qty : null, weight_pct: hasWeight ? a.weight_pct : null, avg_price: a.avg_price ?? null } };
       }
       case "set_total_balance":
         await db.prepare("UPDATE users SET total_balance=? WHERE id=?").bind(a.amount, user.id).run();
@@ -171,7 +177,7 @@ async function buildSystem(user, env) {
     "- 사용자가 매수·매도했다고 말하면 add_trade 로 기록하고, 이유·목표가·손절선을 한 번만 가볍게 묻는다(강요하지 않는다). 보유 수량도 set_holding 으로 맞춘다.",
     "- 사용자가 투자 원칙·선호·관심사를 말하면 save_memory 로 저장한다.",
     "- 일정을 말하면 add_event 로 저장하고 알림 시각을 확인해 준다.",
-    "- 증권사 앱 캡처 이미지를 받으면 종목·수량·평단·평가금액을 읽어 정리하고, 보유 목록에 반영할지 묻는다.",
+    "- 증권사 앱 캡처나 비중표 이미지를 받으면 종목과 수량 또는 비중(%)을 읽어 set_holding 으로 전부 등록한다. 수량이 없고 비중만 있으면 weight_pct 에 넣는다. 등록 후 무엇을 넣었는지 표로 보여준다.",
     "- 기업 분석·보고서를 요청받으면 get_financials 로 실제 재무 숫자를 먼저 가져온다. 숫자는 가져온 값만 쓰고 추정하지 않는다. 최신 소식은 구글 검색으로 보완한다.",
     "- '이 종목 어때', '안전한가', '오래 들고 갈까 짧게 볼까', '나한테 맞나' 류의 질문에는 my_style 과 risk_profile 을 함께 불러 본인 매매 습관과 종목 성격을 대조해 답한다. 예: '평소 2주쯤 들고 계시는데 이 종목은 변동성이 높아 그 기간에 손실 폭이 커질 수 있습니다.'",
     "- 주가가 오를지 내릴지는 단정하지 않는다. 증권사 목표주가 컨센서스는 '애널리스트 평균은 이렇다'고 인용만 하고, 맞는다는 보장이 없다고 덧붙인다.",

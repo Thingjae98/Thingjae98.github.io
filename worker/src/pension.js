@@ -48,12 +48,16 @@ export function checkPension({ code, name, kind, accountType = "pension" }) {
 /** 위험자산(70% 그룹) 비중 계산. holdings: [{code,name,qty,price}] price=현재가 */
 export function riskRatio(holdings, totalBalance, add) {
   const items = add ? [...holdings, add] : holdings;
-  let risk = 0;
+  let risk = 0, riskWeight = 0, knownWeight = 0;
   for (const h of items) {
     const r = h.code && rules[h.code];
     const group = r ? r.reti : (h.name && byName(h.name) ? "0" : "70");
-    if (group === "70" || group === "0") risk += (h.qty || 0) * (h.price || 0);
+    const isRisk = group === "70" || group === "0";
+    if (h.weight_pct != null) { knownWeight += h.weight_pct; if (isRisk) riskWeight += h.weight_pct; }
+    if (isRisk) risk += (h.qty || 0) * (h.price || 0) || (h.weight_pct && totalBalance ? (h.weight_pct / 100) * totalBalance : 0);
   }
+  // 비중만 아는 경우에는 비중 합으로 바로 낸다
+  if (knownWeight > 0) return { risk: Math.round(risk), ratio: Math.round(riskWeight * 10) / 10, by_weight: true, known_weight_pct: Math.round(knownWeight * 10) / 10 };
   if (!totalBalance) return { risk, ratio: null };
   return { risk, ratio: Math.round((risk / totalBalance) * 1000) / 10 };
 }

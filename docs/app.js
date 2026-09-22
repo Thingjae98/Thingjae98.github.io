@@ -268,9 +268,10 @@
     const hl = $("#holdings-list");
     hl.innerHTML = d.holdings.length ? d.holdings.map((h) => {
       const pl = h.avg_price && h.price ? ((h.price - h.avg_price) / h.avg_price) * 100 : null;
-      const share = totalValue && h.value ? ((h.value / totalValue) * 100).toFixed(1) + "%" : null;
-      return `<div class="item"><div class="item-main"><div class="item-title">${esc(h.name)}</div><div class="item-sub">${fmt(h.qty)}주${h.avg_price ? ` · 평단 ${fmt(h.avg_price)}원` : ""}${share ? ` · 비중 ${share}` : ""}</div></div>
-        <div class="item-num"><div>${fmt(h.value)}원</div>${pl != null ? `<div class="item-sub ${pl >= 0 ? "up" : "down"}">${pl >= 0 ? "+" : ""}${pl.toFixed(1)}%</div>` : ""}</div>
+      const share = h.weight_pct != null ? h.weight_pct + "%" : (totalValue && h.value ? ((h.value / totalValue) * 100).toFixed(1) + "%" : null);
+      const detail = [h.qty ? `${fmt(h.qty)}주` : null, h.avg_price ? `평단 ${fmt(h.avg_price)}원` : null, share ? `비중 ${share}` : null].filter(Boolean).join(" · ") || "수량 미입력";
+      return `<div class="item"><div class="item-main"><div class="item-title">${esc(h.name)}</div><div class="item-sub">${detail}</div></div>
+        <div class="item-num">${h.value != null ? `<div>${fmt(h.value)}원</div>` : (h.price ? `<div class="item-sub">${fmt(h.price)}원</div>` : "")}${pl != null ? `<div class="item-sub ${pl >= 0 ? "up" : "down"}">${pl >= 0 ? "+" : ""}${pl.toFixed(1)}%</div>` : ""}</div>
         <button class="del" type="button" data-del-holding="${h.id}" aria-label="${esc(h.name)} 삭제"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>`;
     }).join("") : `<div class="empty-row">아직 등록된 종목이 없습니다.</div>`;
     $("#holdings-updated").textContent = d.holdings.length ? "현재가 기준" : "";
@@ -289,7 +290,7 @@
     toast("사진을 읽고 있습니다. 잠시만 기다려 주세요.", 8000);
     try {
       const r = await api("POST", "/chat", {
-        text: "이 사진은 제 보유 종목 목록입니다. 종목명과 수량 또는 비중을 읽어서 보유 목록에 전부 등록해 주세요. 수량이 없고 비중(%)만 있으면 비중을 알려주고 수량은 넣지 마세요.",
+        text: "이 사진은 제 보유 종목 목록입니다. 종목명과 수량 또는 비중(%)을 읽어서 set_holding 으로 전부 등록해 주세요. 수량이 없고 비중만 적혀 있으면 weight_pct 에 그 값을 넣으세요. 등록한 내용을 표로 보여주세요.",
         image: { mimeType: img.mimeType, data: img.data },
       });
       chatLoaded = false;
