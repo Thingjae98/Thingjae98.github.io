@@ -296,3 +296,11 @@ img { max-width: 100%; display: block; }
 .mode[aria-checked="true"] { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
 .mode-hint { flex: 1 1 100%; font-size: 0.78rem; color: var(--ink-2); padding: 2px 2px 0; }
 @media (min-width: 1024px) { .mode-bar { padding: 6px 24px 0; } }
+
+/* 일정 입력칸: 모바일에서 날짜·시각 칸이 눌려 겹치지 않게 */
+@media (max-width: 480px) {
+  .row2 { grid-template-columns: 1fr; }
+  #event-form .field input[type="date"], #event-form .field input[type="time"] { width: 100%; min-width: 0; }
+}
+.field input[type="date"], .field input[type="time"] { min-width: 0; appearance: none; -webkit-appearance: none; background: var(--bg); }
+.row2 > .field { min-width: 0; }

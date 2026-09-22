@@ -261,11 +261,14 @@ async function handleChat(user, body, env) {
   const system = await buildSystem(user, env);
   const ctx = {};
   const r = await geminiChat({ system, history: hist, userParts, runTool: makeToolRunner(user, env, ctx), env, model: mode === "fast" ? (env.GEMINI_MODEL_FAST || "gemini-3.5-flash-lite") : undefined });
-  await env.DB.batch([
-    env.DB.prepare("INSERT INTO messages (user_id, role, content, has_image, created_at) VALUES (?,?,?,?,datetime('now','+9 hours'))").bind(user.id, "user", text || "(이미지)", image ? 1 : 0),
-    env.DB.prepare("INSERT INTO messages (user_id, role, content, document, created_at) VALUES (?,?,?,?,datetime('now','+9 hours'))").bind(user.id, "model", r.text, ctx.document ? JSON.stringify(ctx.document) : null),
-    env.DB.prepare("INSERT INTO usage_log (user_id, in_tokens, out_tokens, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(user.id, r.usage.in, r.usage.out),
-  ]);
+  const stmts = [env.DB.prepare("INSERT INTO usage_log (user_id, in_tokens, out_tokens, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(user.id, r.usage.in, r.usage.out)];
+  if (body.keep_log !== false) {
+    stmts.unshift(
+      env.DB.prepare("INSERT INTO messages (user_id, role, content, has_image, created_at) VALUES (?,?,?,?,datetime('now','+9 hours'))").bind(user.id, "user", text || "(이미지)", image ? 1 : 0),
+      env.DB.prepare("INSERT INTO messages (user_id, role, content, document, created_at) VALUES (?,?,?,?,datetime('now','+9 hours'))").bind(user.id, "model", r.text, ctx.document ? JSON.stringify(ctx.document) : null),
+    );
+  }
+  await env.DB.batch(stmts);
   return { reply: r.text, tools: r.calls, document: ctx.document || null, job_id: ctx.job_id || null };
 }
 

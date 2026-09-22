@@ -174,9 +174,9 @@
     resumePendingJobs();
   }
   const MODE_HINT = {
-    fast: "값싼 모델로 빠르게 답합니다. 시세·일정처럼 간단한 것에 좋습니다.",
-    smart: "기본 모델입니다. 종목 분석과 뉴스까지 대부분 여기서 처리합니다.",
-    deep: "이 PC에서 시간을 들여 깊이 조사합니다. 몇 분 걸리고 답은 나중에 도착합니다.",
+    fast: "제미나이 라이트 모델. 시세·일정처럼 간단한 것을 빠르고 싸게 답합니다.",
+    smart: "제미나이 플래시 모델. 종목 분석과 뉴스까지 대부분 여기서 처리합니다.",
+    deep: "클로드 오퍼스 모델이 집 PC에서 깊이 조사합니다. 몇 분 걸리고 답은 나중에 도착합니다.",
   };
   let chatMode = store.get("fa_mode") || "smart";
   function applyMode() {
@@ -290,13 +290,12 @@
     toast("사진을 읽고 있습니다. 잠시만 기다려 주세요.", 8000);
     try {
       const r = await api("POST", "/chat", {
-        text: "이 사진은 제 보유 종목 목록입니다. 종목명과 수량 또는 비중(%)을 읽어서 set_holding 으로 전부 등록해 주세요. 수량이 없고 비중만 적혀 있으면 weight_pct 에 그 값을 넣으세요. 등록한 내용을 표로 보여주세요.",
+        text: "이 사진은 제 보유 종목 목록입니다. 종목명과 수량 또는 비중(%)을 읽어서 set_holding 으로 전부 등록해 주세요. 수량이 없고 비중만 적혀 있으면 weight_pct 에 그 값을 넣으세요. 등록한 내용을 한 줄로만 알려주세요.",
         image: { mimeType: img.mimeType, data: img.data },
+        keep_log: false,
       });
-      chatLoaded = false;
-      toast("등록했습니다. 대화 탭에서 내용을 확인하세요.", 6000);
+      toast(r.reply ? r.reply.replace(/[#*|]/g, "").slice(0, 90) : "등록했습니다.", 7000);
       loadAssets();
-      if (r.reply) alert(r.reply.slice(0, 500));
     } catch (ex) { toast(ex.message); }
   });
   $("#balance-form").addEventListener("submit", async (e) => {

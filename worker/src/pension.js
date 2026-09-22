@@ -1,7 +1,7 @@
 // 퇴직연금(DC/IRP) 계좌 투자가능 판정. 근거: 근로자퇴직급여보장법 시행규칙 §10, 퇴직연금감독규정 §9·§11 (2026-09-22 기준)
 import rules from "./etf_rules.json";
 
-const SOURCE_TABLE = "삼성(KODEX)·미래에셋(TIGER) 운용사 공개 '퇴직연금 투자가능' 표";
+const SOURCE_TABLE = "국내 ETF 1,175종 판정표(etfcheck 편입가능 여부 + 운용사 5곳 비율 공시)";
 const FOOTER = "최종 확인은 증권사 앱의 '퇴직연금 투자가능' 표시로 해주세요.";
 
 // 종목명만으로 판정되는 규칙(운용사 표에 없을 때 보조)
@@ -29,19 +29,21 @@ export function checkPension({ code, name, kind, accountType = "pension" }) {
     return { verdict: "불가", group: "0", basis: "개별 주식은 퇴직연금 계좌에서 직접 매수 불가(시행규칙 §10②, 감독규정 §11②1호). 국내상장 리츠·인프라펀드는 예외", footer: FOOTER };
   const r = code && rules[code];
   if (r) {
-    if (r.reti === "0") return { verdict: "불가", group: "0", basis: `${SOURCE_TABLE}에 '퇴직연금 투자 불가'로 표시`, footer: FOOTER };
+    if (r.reti === "0") return { verdict: "불가", group: "0", basis: `${SOURCE_TABLE}에서 퇴직연금 편입 불가로 확인(레버리지·인버스·선물형)`, footer: FOOTER };
+    const est = r.est ? " ※ 운용사가 비율을 따로 공시하지 않아 자산군으로 추정한 값입니다" : "";
     return {
       verdict: "가능", group: r.reti,
-      basis: r.reti === "100"
-        ? `${SOURCE_TABLE}에 '퇴직연금 100%'. 채권형·주식 50% 미만 혼합·적격 TDF 등 안전자산이라 한도 없이 담을 수 있음(감독규정 §11①)`
-        : `${SOURCE_TABLE}에 '퇴직연금 70%'. 위험자산이라 다른 위험자산과 합쳐 전체 적립금의 70%까지만 가능(시행규칙 §10①2호)`,
+      basis: (r.reti === "100"
+        ? `안전자산으로 분류되어 한도 없이 담을 수 있음(감독규정 §11①). ${SOURCE_TABLE} 기준`
+        : `위험자산이라 다른 위험자산과 합쳐 전체 적립금의 70%까지만 가능(시행규칙 §10①2호). ${SOURCE_TABLE} 기준`) + est,
       footer: FOOTER,
+      estimated: !!r.est,
     };
   }
   const n = name ? byName(name) : null;
   if (n) return { ...n, footer: FOOTER };
   if (kind === "etf" || kind === "etn")
-    return { verdict: "확인 필요", group: null, basis: `${SOURCE_TABLE}에 없는 종목. 이름에 레버리지·인버스·원자재선물이 없으면 대개 70% 그룹이지만 운용사 표로 확인되지 않음`, footer: FOOTER };
+    return { verdict: "확인 필요", group: null, basis: `${SOURCE_TABLE}에 없는 종목입니다. 최근 상장했을 수 있습니다`, footer: FOOTER };
   return { verdict: "확인 필요", group: null, basis: "종목 종류를 확인하지 못함", footer: FOOTER };
 }
 

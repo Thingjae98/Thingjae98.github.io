@@ -55,7 +55,9 @@ async function report(job_id, result, error) {
 function runClaude(prompt) {
   return new Promise((resolve, reject) => {
     // stdin 을 닫아야 claude 가 입력을 기다리지 않는다. 인자는 배열로 넘겨 이스케이프 문제를 피한다.
-    const p = spawn("claude", ["-p", prompt], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+    // 조사에 필요한 읽기 전용 도구만 연다. 파일 쓰기·명령 실행은 주지 않는다.
+    const args = ["-p", prompt, "--allowedTools", "WebSearch", "WebFetch"];
+    const p = spawn("claude", args, { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
     let out = "", err = "";
     const timer = setTimeout(() => { p.kill(); reject(new Error("10분을 넘겨 중단했습니다")); }, TIMEOUT_MS);
     p.stdout.on("data", (d) => (out += d));
