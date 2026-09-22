@@ -150,6 +150,7 @@
       addMsg(m.role, m.content, { time: timeLabel(m.created_at), document: doc });
     }
     chatLoaded = true;
+    resumePendingJobs();
   }
   const input = $("#chat-input");
   input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 160) + "px"; });
@@ -175,6 +176,7 @@
       const r = await api("POST", "/chat", { text, image: img ? { mimeType: img.mimeType, data: img.data } : undefined });
       pending.remove();
       addMsg("model", r.reply, { time: new Date().toTimeString().slice(0, 5), document: r.document });
+      if (r.job_id) watchJob(r.job_id);
     } catch (ex) {
       pending.remove();
       addMsg("model", `죄송합니다, 답을 가져오지 못했습니다. (${ex.message}) 잠시 후 다시 말씀해 주세요.`);
@@ -388,6 +390,40 @@
       }
     } catch (ex) { toast(ex.message); }
   });
+
+  // ---------- 오래 걸리는 분석 ----------
+  const watching = new Set();
+  function watchJob(id) {
+    if (watching.has(id)) return;
+    watching.add(id);
+    const el = addMsg("model", "자세히 알아보고 있습니다. 몇 분 걸립니다", { pending: true });
+    el.dataset.job = id;
+    const started = Date.now();
+    const tick = async () => {
+      if (Date.now() - started > 20 * 60 * 1000) {
+        el.remove(); watching.delete(id);
+        addMsg("model", "분석이 예상보다 오래 걸립니다. 잠시 후 대화를 새로 열어 확인해 주세요.");
+        return;
+      }
+      try {
+        const { jobs } = await api("GET", "/jobs");
+        const j = jobs.find((x) => x.id === id);
+        if (j && (j.status === "done" || j.status === "failed")) {
+          el.remove(); watching.delete(id);
+          addMsg("model", j.status === "done" ? j.result : `분석을 마치지 못했습니다. (${j.error || "원인 미상"})`, { time: new Date().toTimeString().slice(0, 5) });
+          return;
+        }
+      } catch {}
+      setTimeout(tick, 15000);
+    };
+    setTimeout(tick, 15000);
+  }
+  async function resumePendingJobs() {
+    try {
+      const { jobs } = await api("GET", "/jobs");
+      for (const j of jobs) if (j.status === "queued" || j.status === "running") watchJob(j.id);
+    } catch {}
+  }
 
   // ---------- 문서 ----------
   let currentDoc = null;

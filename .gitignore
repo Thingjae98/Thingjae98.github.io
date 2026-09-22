@@ -5,3 +5,4 @@ data/*.html
 data/*.jsonl
 data/kodex_api.json
 notes/
+bridge/.env

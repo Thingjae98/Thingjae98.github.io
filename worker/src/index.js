@@ -118,6 +118,12 @@ function makeToolRunner(user, env, ctx = {}) {
         ]);
         return { quote: q, risk: rp };
       }
+      case "deep_research": {
+        const r = await db.prepare("INSERT INTO jobs (user_id, prompt, context) VALUES (?,?,?)")
+          .bind(user.id, a.request, a.context ? String(a.context).slice(0, 4000) : null).run();
+        ctx.job_id = r.meta.last_row_id;
+        return { queued: true, job_id: r.meta.last_row_id, note: "시간이 걸리는 작업이라 뒤에서 처리합니다. 사용자에게 '준비되면 알려드리겠습니다' 정도로 한 줄만 답하세요. 결과를 지어내지 마세요." };
+      }
       case "make_document": ctx.document = a; return { ok: true, note: "화면에서 파일로 만들어 사용자에게 내려줍니다. 답변에는 무엇을 만들었는지 한 줄만 적으세요." };
       default: throw new Error("unknown tool " + name);
     }
@@ -171,6 +177,7 @@ async function buildSystem(user, env) {
     "- 주가가 오를지 내릴지는 단정하지 않는다. 증권사 목표주가 컨센서스는 '애널리스트 평균은 이렇다'고 인용만 하고, 맞는다는 보장이 없다고 덧붙인다.",
     "- 매매 기록이 적어 성향이 안 나오면 솔직히 말하고, 매매하실 때 말씀해 주시면 쌓인다고 안내한다.",
     "- '보고서로 만들어줘', 'PDF로', '발표자료로', 'PPT로' 같은 요청에는 make_document 를 부른다. 내용을 먼저 조사한 뒤 마지막에 부른다. 답변에는 무엇을 만들었는지 한 줄만 쓴다.",
+    "- 여러 종목 비교, 업종 전반 조사, 포트폴리오 전체 점검처럼 시간이 걸리는 요청은 deep_research 에 맡긴다. 맡긴 뒤에는 결과를 지어내지 말고 준비되면 알려드리겠다고만 답한다.",
     "- 답은 짧게. 표가 필요하면 마크다운 표. 이모지는 쓰지 않는다.",
     "",
     pensionRuleText(user.account_type),
@@ -234,7 +241,7 @@ async function handleChat(user, body, env) {
     env.DB.prepare("INSERT INTO messages (user_id, role, content, document, created_at) VALUES (?,?,?,?,datetime('now','+9 hours'))").bind(user.id, "model", r.text, ctx.document ? JSON.stringify(ctx.document) : null),
     env.DB.prepare("INSERT INTO usage_log (user_id, in_tokens, out_tokens, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(user.id, r.usage.in, r.usage.out),
   ]);
-  return { reply: r.text, tools: r.calls, document: ctx.document || null };
+  return { reply: r.text, tools: r.calls, document: ctx.document || null, job_id: ctx.job_id || null };
 }
 
 // ---------- 라우터 ----------
@@ -263,6 +270,38 @@ export default {
         return json(await newSession(u, env), 200, origin);
       }
       if (p === "/push/vapid") return json({ key: env.VAPID_PUBLIC }, 200, origin);
+
+      // ---------- 작업 대기줄 (로컬 PC 작업자) ----------
+      if (p.startsWith("/worker/")) {
+        if ((req.headers.get("X-Worker-Key") || "") !== env.WORKER_KEY) return json({ error: "작업자 인증 실패" }, 403, origin);
+        if (p === "/worker/claim" && req.method === "POST") {
+          const job = await env.DB.prepare("SELECT * FROM jobs WHERE status='queued' ORDER BY id LIMIT 1").first();
+          if (!job) return json({ job: null }, 200, origin);
+          const upd = await env.DB.prepare("UPDATE jobs SET status='running', claimed_at=datetime('now','+9 hours') WHERE id=? AND status='queued'").bind(job.id).run();
+          if (!upd.meta.changes) return json({ job: null }, 200, origin); // 다른 작업자가 먼저 가져감
+          const u = await env.DB.prepare("SELECT name, honorific, tone, account_type FROM users WHERE id=?").bind(job.user_id).first();
+          return json({ job: { id: job.id, prompt: job.prompt, context: job.context, user: u } }, 200, origin);
+        }
+        if (p === "/worker/result" && req.method === "POST") {
+          const { job_id, result, error } = body;
+          const job = await env.DB.prepare("SELECT * FROM jobs WHERE id=?").bind(job_id).first();
+          if (!job) return json({ error: "없는 작업" }, 404, origin);
+          await env.DB.prepare("UPDATE jobs SET status=?, result=?, error=?, finished_at=datetime('now','+9 hours') WHERE id=?")
+            .bind(error ? "failed" : "done", result ?? null, error ?? null, job_id).run();
+          const text = error ? `요청하신 분석을 마치지 못했습니다. (${String(error).slice(0, 200)})` : result;
+          await env.DB.prepare("INSERT INTO messages (user_id, role, content, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(job.user_id, "model", text).run();
+          const subs = (await env.DB.prepare("SELECT * FROM push_subs WHERE user_id=?").bind(job.user_id).all()).results;
+          const u = await env.DB.prepare("SELECT agent_name, push_enabled FROM users WHERE id=?").bind(job.user_id).first();
+          const hour = kst().getUTCHours();
+          if (u?.push_enabled && hour >= QUIET_TO && hour < QUIET_FROM) {
+            for (const s of subs) { const rr = await sendPush(s, { title: `${u.agent_name} 분석 완료`, body: String(text).slice(0, 120), url: "/#chat" }, env); if (rr.gone) await env.DB.prepare("DELETE FROM push_subs WHERE id=?").bind(s.id).run(); }
+            await env.DB.prepare("INSERT INTO push_log (user_id, title, sent_at) VALUES (?,?,datetime('now','+9 hours'))").bind(job.user_id, "분석 완료").run();
+          }
+          return json({ ok: true }, 200, origin);
+        }
+        return json({ error: "not found" }, 404, origin);
+      }
+
 
       const user = await auth(req, env);
       if (!user) return json({ error: "로그인이 필요합니다" }, 401, origin);
@@ -355,6 +394,12 @@ export default {
           return json({ by_user: byUser, by_day: byDay, month, price: { in_per_mtok_usd: 0.75, out_per_mtok_usd: 3.75, model: env.GEMINI_MODEL } }, 200, origin);
         }
         return json({ error: "not found" }, 404, origin);
+      }
+
+      // ---------- 작업 대기줄 (사용자) ----------
+      if (p === "/jobs" && req.method === "GET") {
+        const rows = (await db.prepare("SELECT id, prompt, status, result, error, created_at, finished_at FROM jobs WHERE user_id=? ORDER BY id DESC LIMIT 20").bind(user.id).all()).results;
+        return json({ jobs: rows }, 200, origin);
       }
 
       if (p === "/push/subscribe" && req.method === "POST") {

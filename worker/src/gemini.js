@@ -16,6 +16,7 @@ export const TOOL_DECLS = [
   { name: "my_style", description: "사용자의 매매일지를 분석해 투자 성향(평균 보유기간, 매매 주기, 승률, 평균 손익, 목표가·손절선을 세우는 비율)을 가져온다. '나한테 맞는지', '장기로 들까 단기로 들까', '내 매매 습관' 같은 질문에 반드시 먼저 부른다.", parameters: { type: "OBJECT", properties: {} } },
   { name: "risk_profile", description: "종목의 위험 성격(최근 변동성, 최대 낙폭, 증권사 목표주가 컨센서스)을 가져온다. 종목이 안전한지, 오래 들고 갈 만한지 물을 때 my_style 과 함께 부른다.", parameters: { type: "OBJECT", properties: { query: { type: "STRING", description: "종목명 또는 6자리 코드" } }, required: ["query"] } },
   { name: "get_financials", description: "기업의 재무제표(매출액·영업이익·순이익·ROE·부채비율·EPS·PER·PBR·주당배당금)와 시가총액·52주 최고저 같은 투자지표를 가져온다. 기업 분석이나 보고서를 쓸 때 반드시 먼저 부른다. ETF는 재무제표가 없다.", parameters: { type: "OBJECT", properties: { query: { type: "STRING", description: "종목명 또는 6자리 코드" }, period: { type: "STRING", enum: ["annual", "quarter"], description: "연간(기본) 또는 분기" } }, required: ["query"] } },
+  { name: "deep_research", description: "시간이 오래 걸리는 깊은 조사·분석을 뒤에서 처리하도록 맡긴다. 여러 종목 비교, 업종 전반 조사, 포트폴리오 전체 점검처럼 한 번에 답하기 어려운 요청에만 쓴다. 간단한 질문에는 절대 쓰지 않는다. 맡긴 뒤에는 결과를 지어내지 말고 '준비되면 알려드리겠습니다'라고만 답한다.", parameters: { type: "OBJECT", properties: { request: { type: "STRING", description: "무엇을 조사·분석할지 구체적으로" }, context: { type: "STRING", description: "이미 알고 있는 보유 종목·성향 등 참고 자료" } }, required: ["request"] } },
   {
     name: "make_document",
     description: "사용자가 보고서·문서·PDF·발표자료(PPT)를 만들어 달라고 할 때 부른다. 내용을 슬라이드/섹션 양식에 맞춰 채우면 화면이 실제 파일로 만들어 내려준다. 표와 글머리표를 적극 쓰고, 제목은 30자, 글머리표는 한 줄 60자 안쪽으로 짧게 쓴다.",
