@@ -203,11 +203,11 @@ async function runMorningBrief(env, hour, now) {
       const brief = await buildBrief(u, env, { holdings, events });
       if (!brief) continue;
       for (const sb of subs) {
-        const r = await sendPush(sb, { title: `${u.agent_name} 아침 브리핑`, body: brief.text.slice(0, 300), url: "/#chat" }, env);
+        const r = await sendPush(sb, { title: `${u.agent_name} 아침 브리핑`, body: brief.short, url: "/#chat" }, env);
         if (r.gone) await env.DB.prepare("DELETE FROM push_subs WHERE id=?").bind(sb.id).run();
       }
       await env.DB.batch([
-        env.DB.prepare("INSERT INTO messages (user_id, role, content, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(u.id, "model", [brief.text, brief.detail].join("\n\n")),
+        env.DB.prepare("INSERT INTO messages (user_id, role, content, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(u.id, "model", brief.text),
         env.DB.prepare("INSERT INTO push_log (user_id, title, sent_at) VALUES (?,?,datetime('now','+9 hours'))").bind(u.id, "아침 브리핑"),
         env.DB.prepare("INSERT INTO usage_log (user_id, in_tokens, out_tokens, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(u.id, brief.usage.in, brief.usage.out),
       ]);

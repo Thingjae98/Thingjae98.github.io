@@ -1,55 +1,77 @@
-// 아침 브리핑: 보유 종목 등락 + 오늘 일정 + 한 줄 시장 요약. 하루 1회, 켠 사람에게만.
+// 아침 브리핑: 보유 종목 이슈 점검 + 오늘 일정. 하루 1회, 켠 사람에게만.
 import { getQuote } from "./quotes.js";
+import { checkPension } from "./pension.js";
 
-/** 사용자 한 명의 브리핑 본문을 만든다. LLM 한 번만 쓴다(비용 최소). */
+/** 사용자 한 명의 브리핑을 만든다. LLM 한 번만 쓴다. */
 export async function buildBrief(user, env, deps) {
   const { holdings, events } = deps;
-  const lines = [];
+  const pension = user.account_type !== "general";
 
-  const moved = [];
+  const rows = [];
   for (const h of holdings) {
-    if (!h.code) continue;
+    if (!h.code) { rows.push({ name: h.name }); continue; }
     try {
       const q = await getQuote(h.code, env);
-      moved.push({ name: q.name, rate: q.changeRate, price: q.price });
-    } catch {}
+      const p = checkPension({ code: q.code, name: q.name, kind: q.kind, accountType: user.account_type });
+      rows.push({ name: q.name, code: q.code, rate: q.changeRate, price: q.price, group: p.group });
+    } catch { rows.push({ name: h.name, code: h.code }); }
   }
-  moved.sort((a, b) => Math.abs(b.rate) - Math.abs(a.rate));
-  if (moved.length) {
-    lines.push("보유 종목 어제 등락:");
-    for (const m of moved.slice(0, 5)) lines.push(`- ${m.name} ${m.rate > 0 ? "+" : ""}${m.rate}% (${m.price.toLocaleString()}원)`);
-  }
-  if (events.length) {
-    lines.push("오늘 일정:");
-    for (const e of events) lines.push(`- ${e.at.slice(11)} ${e.title}`);
-  }
-  if (!lines.length) return null;
+  if (!rows.length && !events.length) return null;
 
-  const model = env.GEMINI_MODEL || "gemini-3.8-flash";
+  const holdingLines = rows.map((r) => `- ${r.name}${r.rate != null ? ` ${r.rate > 0 ? "+" : ""}${r.rate}% (${r.price?.toLocaleString()}원)` : ""}${pension && r.group ? ` [${r.group === "100" ? "안전자산" : "위험자산"}]` : ""}`);
+  const eventLines = events.map((e) => `- ${e.at.slice(11)} ${e.title}`);
+
+  const format = pension
+    ? [
+        "1) 오늘 시황 세 줄 — 미국 증시, 환율·금리, 국내 장 전망 중 오늘 중요한 것만",
+        "2) 보유 종목 점검 — 비슷한 성격끼리 묶어서, 각 묶음마다 오늘의 이슈 한 줄과 참고 의견(유지 / 지켜보기 / 비중 조절 검토) 한 줄. 의견에는 반드시 근거를 붙인다.",
+        "3) 안전자산 확인 — 퇴직연금은 위험자산이 70%를 넘을 수 없다. 위 목록의 [안전자산] 표시를 보고 한쪽으로 치우쳤으면 짚어준다.",
+        "4) 오늘 눈여겨볼 ETF 한 가지 — 보유 구성에서 빠진 성격을 채울 만한 것. 퇴직연금 매수 가능 여부를 함께 적고, 권유가 아니라 참고임을 밝힌다.",
+      ].join("\n")
+    : [
+        "1) 오늘 시황 세 줄 — 미국 증시, 환율·금리, 국내 장 전망 중 오늘 중요한 것만",
+        "2) 보유 종목 점검 — 비슷한 성격끼리 묶어서, 각 묶음마다 오늘의 이슈 한 줄과 참고 의견(유지 / 지켜보기 / 비중 조절 검토) 한 줄. 의견에는 반드시 근거를 붙인다.",
+        "3) 오늘 눈여겨볼 소식 한 가지",
+      ].join("\n");
+
   const prompt = [
-    `${user.name}${user.honorific}께 보낼 아침 알림 문구를 만든다.`,
+    `${user.name}${user.honorific}께 아침에 보낼 투자 브리핑을 쓴다. 오늘은 ${new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10)}.`,
     `말투: ${user.tone}`,
-    "규칙: 두세 문장, 120자 이내. 오늘 국내 증시에서 눈여겨볼 점 한 가지를 검색해 덧붙인다.",
-    "매수·매도를 권하지 않는다. 인사말은 짧게. 이모지 금지.",
     "",
-    lines.join("\n"),
+    "구글 검색으로 오늘 아침 기준 최신 뉴스를 확인한 뒤 아래 양식으로 쓴다.",
+    format,
+    "",
+    "규칙:",
+    "- 첫 줄은 세 줄 요약이고, 알림에 그대로 뜨므로 120자 안쪽으로 짧게 쓴다.",
+    "- 사라/팔라고 단정하지 않는다. '참고 의견'이라고 밝히고 결정은 본인 몫이라고 한다.",
+    "- 주가가 오른다/내린다고 예측하지 않는다. 확인된 뉴스와 숫자만 쓴다.",
+    "- 60대가 읽는다. 어려운 용어는 처음 나올 때 괄호로 푼다. 이모지는 쓰지 않는다.",
+    "- 마크다운 소제목(##)과 글머리표를 쓰고 전체 1200자 안쪽.",
+    "",
+    rows.length ? "보유 종목(어제 종가 기준 등락):\n" + holdingLines.join("\n") : "보유 종목: 등록된 것 없음",
+    eventLines.length ? "\n오늘 일정:\n" + eventLines.join("\n") : "",
   ].join("\n");
 
+  const model = env.GEMINI_MODEL || "gemini-3.8-flash";
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       tools: [{ googleSearch: {} }],
-      generationConfig: { temperature: 0.5, maxOutputTokens: 400 },
+      generationConfig: { temperature: 0.5, maxOutputTokens: 2000 },
     }),
   });
   const j = await r.json();
   if (!r.ok) throw new Error(`Gemini ${r.status}: ${j.error?.message || ""}`);
   const text = (j.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("").trim();
+  if (!text) return null;
+
+  // 알림에 띄울 짧은 요약: 첫 문단에서 뽑는다
+  const short = text.replace(/^#+.*$/gm, "").split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 3).join(" ").replace(/[*_`]/g, "").slice(0, 160);
   return {
-    text: text || lines.join("\n"),
-    detail: lines.join("\n"),
+    text,
+    short: short || "오늘의 브리핑이 도착했습니다.",
     usage: { in: j.usageMetadata?.promptTokenCount || 0, out: j.usageMetadata?.candidatesTokenCount || 0 },
   };
 }
