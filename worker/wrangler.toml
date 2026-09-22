@@ -10,7 +10,7 @@ VAPID_SUBJECT = "mailto:soavelajewelry@gmail.com"
 [[d1_databases]]
 binding = "DB"
 database_name = "family-agent"
-database_id = "REPLACE_AFTER_wrangler_d1_create"
+database_id = "4c67c06f-7630-4bcc-86ba-54f3caab83e7"
 
 [triggers]
 crons = ["* * * * *"]

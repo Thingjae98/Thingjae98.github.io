@@ -13,7 +13,6 @@ export const TOOL_DECLS = [
   { name: "list_events", description: "다가오는 일정을 가져온다.", parameters: { type: "OBJECT", properties: { days: { type: "INTEGER", description: "며칠치, 기본 7" } } } },
   { name: "delete_event", description: "일정을 삭제한다.", parameters: { type: "OBJECT", properties: { id: { type: "INTEGER" } }, required: ["id"] } },
   { name: "save_memory", description: "사용자가 말한 투자 원칙·선호·관심사처럼 다음 대화에도 기억해야 할 사실을 한 줄로 저장한다.", parameters: { type: "OBJECT", properties: { content: { type: "STRING" } }, required: ["content"] } },
-  { name: "search_news", description: "최근 뉴스 제목 목록을 가져온다(경제·증시·종목). 요약은 결과를 바탕으로 직접 한다.", parameters: { type: "OBJECT", properties: { query: { type: "STRING" } }, required: ["query"] } },
 ];
 
 /**
@@ -32,7 +31,8 @@ export async function chat({ system, history, userParts, runTool, env }) {
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents,
-        tools: [{ functionDeclarations: TOOL_DECLS }],
+        tools: [{ functionDeclarations: TOOL_DECLS }, { googleSearch: {} }],
+        tool_config: { include_server_side_tool_invocations: true },
         generationConfig: { temperature: 0.4, maxOutputTokens: 1500 },
       }),
     });

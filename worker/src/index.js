@@ -1,7 +1,6 @@
 import { chat as geminiChat } from "./gemini.js";
 import { checkPension, riskRatio, pensionRuleText } from "./pension.js";
 import { searchSymbol, getQuote } from "./quotes.js";
-import { searchNews } from "./news.js";
 import { sendPush } from "./push.js";
 
 const QUIET_FROM = 22, QUIET_TO = 7, DAILY_PUSH_CAP = 10, SESSION_DAYS = 30;
@@ -96,7 +95,6 @@ function makeToolRunner(user, env) {
       case "list_events": return { now: kstStr(), events: await upcomingEvents(user.id, a.days || 7, env) };
       case "delete_event": await db.prepare("DELETE FROM events WHERE id=? AND user_id=?").bind(a.id, user.id).run(); return { deleted: a.id };
       case "save_memory": await db.prepare("INSERT INTO memories (user_id, content) VALUES (?,?)").bind(user.id, a.content).run(); return { saved: a.content };
-      case "search_news": return { items: await searchNews(a.query) };
       default: throw new Error("unknown tool " + name);
     }
   };
