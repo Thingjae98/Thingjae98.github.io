@@ -1,0 +1,14 @@
+{
+  "name": "family-agent-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "deploy": "wrangler deploy",
+    "migrate:local": "wrangler d1 migrations apply family-agent --local",
+    "migrate": "wrangler d1 migrations apply family-agent --remote"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

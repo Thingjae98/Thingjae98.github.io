@@ -1,0 +1,7 @@
+node_modules/
+.dev.vars
+.wrangler/
+data/*.html
+data/*.jsonl
+data/kodex_api.json
+notes/

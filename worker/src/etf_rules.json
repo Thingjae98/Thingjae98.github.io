@@ -1,0 +1,2067 @@
+{
+"069500": {
+"name": "KODEX 200",
+"issuer": "KODEX",
+"reti": "70"
+},
+"091180": {
+"name": "KODEX 자동차",
+"issuer": "KODEX",
+"reti": "70"
+},
+"091160": {
+"name": "KODEX 반도체",
+"issuer": "KODEX",
+"reti": "70"
+},
+"091170": {
+"name": "KODEX 은행",
+"issuer": "KODEX",
+"reti": "70"
+},
+"099140": {
+"name": "KODEX 차이나H",
+"issuer": "KODEX",
+"reti": "70"
+},
+"101280": {
+"name": "KODEX 일본TOPIX 100",
+"issuer": "KODEX",
+"reti": "70"
+},
+"102780": {
+"name": "KODEX 삼성그룹",
+"issuer": "KODEX",
+"reti": "70"
+},
+"102970": {
+"name": "KODEX 증권",
+"issuer": "KODEX",
+"reti": "70"
+},
+"102960": {
+"name": "KODEX 기계장비",
+"issuer": "KODEX",
+"reti": "70"
+},
+"114260": {
+"name": "KODEX 국고채3년",
+"issuer": "KODEX",
+"reti": "100"
+},
+"117460": {
+"name": "KODEX 에너지화학",
+"issuer": "KODEX",
+"reti": "70"
+},
+"117700": {
+"name": "KODEX 건설",
+"issuer": "KODEX",
+"reti": "70"
+},
+"117680": {
+"name": "KODEX 철강",
+"issuer": "KODEX",
+"reti": "70"
+},
+"132030": {
+"name": "KODEX 골드선물(H)",
+"issuer": "KODEX",
+"reti": "0"
+},
+"138910": {
+"name": "KODEX 구리선물(H)",
+"issuer": "KODEX",
+"reti": "0"
+},
+"138920": {
+"name": "KODEX 콩선물(H)",
+"issuer": "KODEX",
+"reti": "0"
+},
+"140710": {
+"name": "KODEX 운송",
+"issuer": "KODEX",
+"reti": "70"
+},
+"140700": {
+"name": "KODEX 보험",
+"issuer": "KODEX",
+"reti": "70"
+},
+"144600": {
+"name": "KODEX 은선물(H)",
+"issuer": "KODEX",
+"reti": "0"
+},
+"152380": {
+"name": "KODEX 국채선물10년",
+"issuer": "KODEX",
+"reti": "0"
+},
+"153130": {
+"name": "KODEX 단기채권",
+"issuer": "KODEX",
+"reti": "100"
+},
+"156080": {
+"name": "KODEX MSCI KOREA",
+"issuer": "KODEX",
+"reti": "70"
+},
+"169950": {
+"name": "KODEX 차이나A50",
+"issuer": "KODEX",
+"reti": "70"
+},
+"185680": {
+"name": "KODEX 미국S&P바이오(합성)",
+"issuer": "KODEX",
+"reti": "70"
+},
+"200030": {
+"name": "KODEX 미국S&P500산업재(합성)",
+"issuer": "KODEX",
+"reti": "70"
+},
+"211900": {
+"name": "KODEX 코리아배당성장",
+"issuer": "KODEX",
+"reti": "70"
+},
+"213610": {
+"name": "KODEX 삼성그룹밸류",
+"issuer": "KODEX",
+"reti": "70"
+},
+"214980": {
+"name": "KODEX 단기채권PLUS",
+"issuer": "KODEX",
+"reti": "100"
+},
+"218420": {
+"name": "KODEX 미국S&P500에너지(합성)",
+"issuer": "KODEX",
+"reti": "70"
+},
+"219480": {
+"name": "KODEX 미국S&P500선물(H)",
+"issuer": "KODEX",
+"reti": "0"
+},
+"223190": {
+"name": "KODEX 200 가치저변동",
+"issuer": "KODEX",
+"reti": "70"
+},
+"226490": {
+"name": "KODEX 코스피",
+"issuer": "KODEX",
+"reti": "70"
+},
+"226980": {
+"name": "KODEX 200중소형",
+"issuer": "KODEX",
+"reti": "70"
+},
+"229200": {
+"name": "KODEX 코스닥 150",
+"issuer": "KODEX",
+"reti": "70"
+},
+"229720": {
+"name": "KODEX KTOP 30",
+"issuer": "KODEX",
+"reti": "70"
+},
+"237350": {
+"name": "KODEX 코스피100",
+"issuer": "KODEX",
+"reti": "70"
+},
+"237370": {
+"name": "KODEX 코리아배당성장채권혼합",
+"issuer": "KODEX",
+"reti": "100"
+},
+"244620": {
+"name": "KODEX 모멘텀PLUS",
+"issuer": "KODEX",
+"reti": "70"
+},
+"244660": {
+"name": "KODEX 퀄리티PLUS",
+"issuer": "KODEX",
+"reti": "70"
+},
+"244670": {
+"name": "KODEX 밸류PLUS",
+"issuer": "KODEX",
+"reti": "70"
+},
+"244580": {
+"name": "KODEX 바이오",
+"issuer": "KODEX",
+"reti": "70"
+},
+"251350": {
+"name": "KODEX MSCI선진국",
+"issuer": "KODEX",
+"reti": "70"
+},
+"252650": {
+"name": "KODEX 200 동일가중",
+"issuer": "KODEX",
+"reti": "70"
+},
+"256750": {
+"name": "KODEX 차이나심천ChiNext(합성)",
+"issuer": "KODEX",
+"reti": "70"
+},
+"261220": {
+"name": "KODEX WTI원유선물(H)",
+"issuer": "KODEX",
+"reti": "0"
+},
+"261240": {
+"name": "KODEX 미국달러선물",
+"issuer": "KODEX",
+"reti": "0"
+},
+"269420": {
+"name": "KODEX S&P글로벌인프라(합성)",
+"issuer": "KODEX",
+"reti": "70"
+},
+"266420": {
+"name": "KODEX 헬스케어",
+"issuer": "KODEX",
+"reti": "70"
+},
+"266390": {
+"name": "KODEX 경기소비재",
+"issuer": "KODEX",
+"reti": "70"
+},
+"266410": {
+"name": "KODEX 필수소비재",
+"issuer": "KODEX",
+"reti": "70"
+},
+"266360": {
+"name": "KODEX K콘텐츠",
+"issuer": "KODEX",
+"reti": "70"
+},
+"266370": {
+"name": "KODEX IT",
+"issuer": "KODEX",
+"reti": "70"
+},
+"271060": {
+"name": "KODEX 3대농산물선물(H)",
+"issuer": "KODEX",
+"reti": "0"
+},
+"275280": {
+"name": "KODEX 모멘텀주",
+"issuer": "KODEX",
+"reti": "70"
+},
+"275300": {
+"name": "KODEX 우량주",
+"issuer": "KODEX",
+"reti": "70"
+},
+"275290": {
+"name": "KODEX 가치주",
+"issuer": "KODEX",
+"reti": "70"
+},
+"273130": {
+"name": "KODEX 종합채권(AA-이상) 액티브",
+"issuer": "KODEX",
+"reti": "100"
+},
+"273140": {
+"name": "KODEX 단기변동금리부채권 액티브",
+"issuer": "KODEX",
+"reti": "100"
+},
+"276970": {
+"name": "KODEX 미국S&P500배당귀족커버드콜(합성 H)",
+"issuer": "KODEX",
+"reti": "70"
+},
+"276990": {
+"name": "KODEX 글로벌로봇(합성)",
+"issuer": "KODEX",
+"reti": "70"
+},
+"278530": {
+"name": "KODEX 200TR",
+"issuer": "KODEX",
+"reti": "70"
+},
+"278540": {
+"name": "KODEX MSCI KOREA TR",
+"issuer": "KODEX",
+"reti": "70"
+},
+"280930": {
+"name": "KODEX 미국러셀2000(H)",
+"issuer": "KODEX",
+"reti": "0"
+},
+"279530": {
+"name": "KODEX 고배당주",
+"issuer": "KODEX",
+"reti": "70"
+},
+"279540": {
+"name": "KODEX 최소변동성",
+"issuer": "KODEX",
+"reti": "70"
+},
+"283580": {
+"name": "KODEX 차이나CSI300",
+"issuer": "KODEX",
+"reti": "70"
+},
+"284430": {
+"name": "KODEX 200미국채혼합50",
+"issuer": "KODEX",
+"reti": "100"
+},
+"289040": {
+"name": "KODEX MSCI KOREA ESG유니버설",
+"issuer": "KODEX",
+"reti": "70"
+},
+"291890": {
+"name": "KODEX MSCI EM선물(H)",
+"issuer": "KODEX",
+"reti": "0"
+},
+"292190": {
+"name": "KODEX KRX300",
+"issuer": "KODEX",
+"reti": "70"
+},
+"298770": {
+"name": "KODEX 한국대만IT프리미어",
+"issuer": "KODEX",
+"reti": "70"
+},
+"300950": {
+"name": "KODEX 게임산업",
+"issuer": "KODEX",
+"reti": "70"
+},
+"304940": {
+"name": "KODEX 미국나스닥100선물(H)",
+"issuer": "KODEX",
+"reti": "0"
+},
+"304660": {
+"name": "KODEX 미국30년국채울트라선물(H)",
+"issuer": "KODEX",
+"reti": "0"
+},
+"305720": {
+"name": "KODEX 2차전지산업",
+"issuer": "KODEX",
+"reti": "70"
+},
+"308620": {
+"name": "KODEX 미국10년국채선물",
+"issuer": "KODEX",
+"reti": "0"
+},
+"315930": {
+"name": "KODEX Top5Plus TR",
+"issuer": "KODEX",
+"reti": "70"
+},
+"314250": {
+"name": "KODEX 미국빅테크10(H)",
+"issuer": "KODEX",
+"reti": "70"
+},
+"321410": {
+"name": "KODEX 멀티에셋하이인컴(H)",
+"issuer": "KODEX",
+"reti": "70"
+},
+"325010": {
+"name": "KODEX 성장주",
+"issuer": "KODEX",
+"reti": "70"
+},
+"325020": {
+"name": "KODEX 배당가치",
+"issuer": "KODEX",
+"reti": "70"
+},
+"329670": {
+"name": "KODEX TRF7030",
+"issuer": "KODEX",
+"reti": "70"
+},
+"329660": {
+"name": "KODEX TRF5050",
+"issuer": "KODEX",
+"reti": "100"
+},
+"329650": {
+"name": "KODEX TRF3070",
+"issuer": "KODEX",
+"reti": "100"
+},
+"337120": {
+"name": "KODEX 멀티팩터",
+"issuer": "KODEX",
+"reti": "70"
+},
+"337140": {
+"name": "KODEX 코스피대형주",
+"issuer": "KODEX",
+"reti": "70"
+},
+"337150": {
+"name": "KODEX 200exTOP",
+"issuer": "KODEX",
+"reti": "70"
+},
+"337160": {
+"name": "KODEX 200ESG",
+"issuer": "KODEX",
+"reti": "70"
+},
+"364690": {
+"name": "KODEX 혁신기술테마액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"352560": {
+"name": "KODEX 미국부동산리츠(H)",
+"issuer": "KODEX",
+"reti": "70"
+},
+"352540": {
+"name": "KODEX 일본부동산리츠(H)",
+"issuer": "KODEX",
+"reti": "70"
+},
+"359210": {
+"name": "KODEX 코스피TR",
+"issuer": "KODEX",
+"reti": "70"
+},
+"360140": {
+"name": "KODEX 200롱 코스닥150숏선물",
+"issuer": "KODEX",
+"reti": "0"
+},
+"360150": {
+"name": "KODEX 코스닥150롱 코스피200숏선물",
+"issuer": "KODEX",
+"reti": "0"
+},
+"363580": {
+"name": "KODEX 200IT TR",
+"issuer": "KODEX",
+"reti": "70"
+},
+"363570": {
+"name": "KODEX 장기종합채권(AA-이상) 액티브",
+"issuer": "KODEX",
+"reti": "100"
+},
+"368680": {
+"name": "KODEX K-뉴딜디지털플러스",
+"issuer": "KODEX",
+"reti": "70"
+},
+"372330": {
+"name": "KODEX 차이나항셍테크",
+"issuer": "KODEX",
+"reti": "70"
+},
+"373490": {
+"name": "KODEX 코리아혁신성장액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"375770": {
+"name": "KODEX 탄소효율그린뉴딜",
+"issuer": "KODEX",
+"reti": "70"
+},
+"415340": {
+"name": "KODEX 차이나과창판STAR50(합성)",
+"issuer": "KODEX",
+"reti": "70"
+},
+"379810": {
+"name": "KODEX 미국나스닥100",
+"issuer": "KODEX",
+"reti": "70"
+},
+"379800": {
+"name": "KODEX 미국S&P500",
+"issuer": "KODEX",
+"reti": "70"
+},
+"385510": {
+"name": "KODEX 신재생에너지액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"385520": {
+"name": "KODEX 자율주행액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"390400": {
+"name": "KODEX 미국스마트모빌리티S&P",
+"issuer": "KODEX",
+"reti": "70"
+},
+"390390": {
+"name": "KODEX 미국반도체",
+"issuer": "KODEX",
+"reti": "70"
+},
+"395160": {
+"name": "KODEX AI반도체TOP2플러스",
+"issuer": "KODEX",
+"reti": "70"
+},
+"395150": {
+"name": "KODEX 웹툰&드라마",
+"issuer": "KODEX",
+"reti": "70"
+},
+"395170": {
+"name": "KODEX Top10동일가중",
+"issuer": "KODEX",
+"reti": "70"
+},
+"400570": {
+"name": "KODEX 유럽탄소배출권선물ICE(H)",
+"issuer": "KODEX",
+"reti": "0"
+},
+"401470": {
+"name": "KODEX 메타버스액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"404260": {
+"name": "KODEX 기후변화솔루션",
+"issuer": "KODEX",
+"reti": "70"
+},
+"411420": {
+"name": "KODEX 미국나스닥AI테크액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"419420": {
+"name": "KODEX 미국클린에너지나스닥",
+"issuer": "KODEX",
+"reti": "70"
+},
+"419430": {
+"name": "KODEX 차이나2차전지MSCI(합성)",
+"issuer": "KODEX",
+"reti": "70"
+},
+"439860": {
+"name": "KODEX ESG종합채권(A-이상) 액티브",
+"issuer": "KODEX",
+"reti": "100"
+},
+"437070": {
+"name": "KODEX 아시아달러채권ESG플러스액티브",
+"issuer": "KODEX",
+"reti": "100"
+},
+"437080": {
+"name": "KODEX 미국종합채권ESG액티브(H)",
+"issuer": "KODEX",
+"reti": "100"
+},
+"423160": {
+"name": "KODEX KOFR금리 액티브(합성)",
+"issuer": "KODEX",
+"reti": "70"
+},
+"428510": {
+"name": "KODEX 차이나AI테크액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"428560": {
+"name": "KODEX 미국ETF산업Top10 Indxx",
+"issuer": "KODEX",
+"reti": "70"
+},
+"433970": {
+"name": "KODEX TDF2030 액티브 적격",
+"issuer": "KODEX",
+"reti": "100"
+},
+"433980": {
+"name": "KODEX TDF2040 액티브  적격",
+"issuer": "KODEX",
+"reti": "100"
+},
+"434060": {
+"name": "KODEX TDF2050 액티브 적격",
+"issuer": "KODEX",
+"reti": "100"
+},
+"439870": {
+"name": "KODEX 국고채30년 액티브",
+"issuer": "KODEX",
+"reti": "100"
+},
+"441640": {
+"name": "KODEX 미국배당커버드콜액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"445290": {
+"name": "KODEX 로봇액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"445150": {
+"name": "KODEX 친환경조선해운액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"448330": {
+"name": "KODEX 삼성전자채권혼합",
+"issuer": "KODEX",
+"reti": "100"
+},
+"446690": {
+"name": "KODEX 아시아AI반도체exChina액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"449190": {
+"name": "KODEX 미국나스닥100(H)",
+"issuer": "KODEX",
+"reti": "70"
+},
+"449180": {
+"name": "KODEX 미국S&P500(H)",
+"issuer": "KODEX",
+"reti": "70"
+},
+"450190": {
+"name": "KODEX 한중반도체(합성)",
+"issuer": "KODEX",
+"reti": "70"
+},
+"450180": {
+"name": "KODEX 한중전기차(합성)",
+"issuer": "KODEX",
+"reti": "70"
+},
+"453640": {
+"name": "KODEX 미국S&P500 헬스케어",
+"issuer": "KODEX",
+"reti": "70"
+},
+"453630": {
+"name": "KODEX 미국S&P500 필수소비재",
+"issuer": "KODEX",
+"reti": "70"
+},
+"453660": {
+"name": "KODEX 미국S&P500 경기소비재",
+"issuer": "KODEX",
+"reti": "70"
+},
+"453650": {
+"name": "KODEX 미국S&P500금융",
+"issuer": "KODEX",
+"reti": "70"
+},
+"453810": {
+"name": "KODEX 인도Nifty50",
+"issuer": "KODEX",
+"reti": "70"
+},
+"455030": {
+"name": "KODEX 미국달러SOFR금리 액티브(합성)",
+"issuer": "KODEX",
+"reti": "70"
+},
+"456250": {
+"name": "KODEX 유럽명품TOP10 STOXX",
+"issuer": "KODEX",
+"reti": "70"
+},
+"457690": {
+"name": "KODEX 33-06 국고채액티브",
+"issuer": "KODEX",
+"reti": "100"
+},
+"457700": {
+"name": "KODEX 53-09 국고채액티브",
+"issuer": "KODEX",
+"reti": "100"
+},
+"459560": {
+"name": "KODEX 테슬라밸류체인FactSet",
+"issuer": "KODEX",
+"reti": "70"
+},
+"459580": {
+"name": "KODEX CD금리액티브(합성)",
+"issuer": "KODEX",
+"reti": "100"
+},
+"461950": {
+"name": "KODEX 2차전지핵심소재 10",
+"issuer": "KODEX",
+"reti": "70"
+},
+"461450": {
+"name": "KODEX 코스닥글로벌",
+"issuer": "KODEX",
+"reti": "70"
+},
+"463640": {
+"name": "KODEX 미국S&P500유틸리티",
+"issuer": "KODEX",
+"reti": "70"
+},
+"463680": {
+"name": "KODEX 미국S&P500테크놀로지",
+"issuer": "KODEX",
+"reti": "70"
+},
+"463690": {
+"name": "KODEX 미국S&P500커뮤니케이션",
+"issuer": "KODEX",
+"reti": "70"
+},
+"468370": {
+"name": "KODEX iShares 미국인플레이션국채액티브",
+"issuer": "KODEX",
+"reti": "100"
+},
+"468630": {
+"name": "KODEX iShares 미국투자등급회사채액티브",
+"issuer": "KODEX",
+"reti": "100"
+},
+"468380": {
+"name": "KODEX iShares 미국하이일드액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"473460": {
+"name": "KODEX 미국서학개미",
+"issuer": "KODEX",
+"reti": "70"
+},
+"471230": {
+"name": "KODEX 국고채10년액티브",
+"issuer": "KODEX",
+"reti": "100"
+},
+"471990": {
+"name": "KODEX AI반도체핵심장비",
+"issuer": "KODEX",
+"reti": "70"
+},
+"473290": {
+"name": "KODEX 26-12 회사채(AA-이상)액티브",
+"issuer": "KODEX",
+"reti": "100"
+},
+"475080": {
+"name": "KODEX 테슬라커버드콜채권혼합액티브",
+"issuer": "KODEX",
+"reti": "100"
+},
+"476070": {
+"name": "KODEX 글로벌비만치료제TOP2 Plus",
+"issuer": "KODEX",
+"reti": "70"
+},
+"476800": {
+"name": "KODEX 한국부동산리츠인프라",
+"issuer": "KODEX",
+"reti": "70"
+},
+"477730": {
+"name": "KODEX 인도타타그룹",
+"issuer": "KODEX",
+"reti": "70"
+},
+"481050": {
+"name": "KODEX CD1년금리플러스액티브(합성)",
+"issuer": "KODEX",
+"reti": "100"
+},
+"481060": {
+"name": "KODEX 미국30년국채타겟커버드콜(합성 H)",
+"issuer": "KODEX",
+"reti": "100"
+},
+"483290": {
+"name": "KODEX 미국배당다우존스타겟커버드콜",
+"issuer": "KODEX",
+"reti": "70"
+},
+"483280": {
+"name": "KODEX 미국AI테크TOP10타겟커버드콜",
+"issuer": "KODEX",
+"reti": "70"
+},
+"485540": {
+"name": "KODEX 미국AI테크TOP10",
+"issuer": "KODEX",
+"reti": "70"
+},
+"487950": {
+"name": "KODEX 대만테크고배당다우존스",
+"issuer": "KODEX",
+"reti": "70"
+},
+"484790": {
+"name": "KODEX 미국30년국채액티브(H)",
+"issuer": "KODEX",
+"reti": "100"
+},
+"487230": {
+"name": "KODEX 미국AI전력핵심인프라",
+"issuer": "KODEX",
+"reti": "70"
+},
+"487240": {
+"name": "KODEX AI전력핵심설비",
+"issuer": "KODEX",
+"reti": "70"
+},
+"489250": {
+"name": "KODEX 미국배당다우존스",
+"issuer": "KODEX",
+"reti": "70"
+},
+"488770": {
+"name": "KODEX 머니마켓액티브",
+"issuer": "KODEX",
+"reti": "100"
+},
+"491090": {
+"name": "KODEX 미국테크TOP3플러스",
+"issuer": "KODEX",
+"reti": "70"
+},
+"494300": {
+"name": "KODEX 미국나스닥100데일리커버드콜OTM",
+"issuer": "KODEX",
+"reti": "70"
+},
+"494890": {
+"name": "KODEX 200액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"498410": {
+"name": "KODEX 금융고배당TOP10타겟위클리커버드콜",
+"issuer": "KODEX",
+"reti": "70"
+},
+"495850": {
+"name": "KODEX 코리아밸류업",
+"issuer": "KODEX",
+"reti": "70"
+},
+"498400": {
+"name": "KODEX 200타겟위클리커버드콜",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0005A0": {
+"name": "KODEX 미국S&P500데일리커버드콜OTM",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0000H0": {
+"name": "KODEX 인도Nifty미드캡100",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0007F0": {
+"name": "KODEX 27-12 회사채(AA-이상)액티브",
+"issuer": "KODEX",
+"reti": "100"
+},
+"0026E0": {
+"name": "KODEX 미국S&P500 버퍼 3월 액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0089C0": {
+"name": "KODEX 미국S&P500변동성확대시커버드콜",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0041D0": {
+"name": "KODEX 미국AI소프트웨어TOP10",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0028X0": {
+"name": "KODEX 미국금융테크액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0082V0": {
+"name": "KODEX TDF2060 액티브 적격",
+"issuer": "KODEX",
+"reti": "100"
+},
+"0038A0": {
+"name": "KODEX 미국휴머노이드로봇",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0041E0": {
+"name": "KODEX 미국S&P500액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0048K0": {
+"name": "KODEX 차이나휴머노이드로봇",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0048J0": {
+"name": "KODEX 미국머니마켓액티브",
+"issuer": "KODEX",
+"reti": "100"
+},
+"0064K0": {
+"name": "KODEX 금액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0065G0": {
+"name": "KODEX 차이나테크TOP10",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0068M0": {
+"name": "KODEX 미국S&P500 버퍼 6월 액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0080G0": {
+"name": "KODEX 방산TOP10",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0089D0": {
+"name": "KODEX 금융고배당TOP10",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0091C0": {
+"name": "KODEX 미국10년국채액티브(H)",
+"issuer": "KODEX",
+"reti": "100"
+},
+"0098F0": {
+"name": "KODEX 원자력SMR",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0115E0": {
+"name": "KODEX 코리아소버린AI",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0117L0": {
+"name": "KODEX 26-12 금융채(AA-이상)액티브",
+"issuer": "KODEX",
+"reti": "100"
+},
+"0119H0": {
+"name": "KODEX 28-12 회사채(AA-이상)액티브",
+"issuer": "KODEX",
+"reti": "100"
+},
+"0115D0": {
+"name": "KODEX 조선TOP10",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0132H0": {
+"name": "KODEX 미국원자력SMR",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0144L0": {
+"name": "KODEX 미국성장커버드콜액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0144M0": {
+"name": "KODEX 미국드론UAM TOP10",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0151S0": {
+"name": "KODEX 미국AI반도체TOP3플러스",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0153K0": {
+"name": "KODEX 주주환원고배당주",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0162M0": {
+"name": "KODEX 금융채1~2년(AA-이상)PLUS액티브",
+"issuer": "KODEX",
+"reti": "100"
+},
+"0162L0": {
+"name": "KODEX 차이나AI반도체TOP10",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0173Y0": {
+"name": "KODEX 미국AI광통신네트워크",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0167Z0": {
+"name": "KODEX 미국우주항공",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0177N0": {
+"name": "KODEX 삼성전자SK하이닉스채권혼합50",
+"issuer": "KODEX",
+"reti": "100"
+},
+"0190G0": {
+"name": "KODEX 반도체타겟위클리커버드콜",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0204D0": {
+"name": "KODEX 현대차로보틱스밸류체인TOP3플러스",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0209D0": {
+"name": "KODEX 전고체배터리ESS TOP2플러스",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0219E0": {
+"name": "KODEX 200커버드콜액티브",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0225V0": {
+"name": "KODEX 미국CPU반도체TOP10",
+"issuer": "KODEX",
+"reti": "70"
+},
+"0231Z0": {
+"name": "KODEX 코리아TDF2065액티브 적격",
+"issuer": "KODEX",
+"reti": "100"
+},
+"0238F0": {
+"name": "KODEX 미국AI메모리TOP2플러스",
+"issuer": "KODEX",
+"reti": "70"
+},
+"488080": {
+"name": "TIGER 반도체TOP10레버리지",
+"issuer": "TIGER",
+"reti": "0"
+},
+"243880": {
+"name": "TIGER 200 IT레버리지",
+"issuer": "TIGER",
+"reti": "0"
+},
+"418670": {
+"name": "TIGER 글로벌AI사이버보안",
+"issuer": "TIGER",
+"reti": "70"
+},
+"267770": {
+"name": "TIGER 200 선물레버리지",
+"issuer": "TIGER",
+"reti": "0"
+},
+"123320": {
+"name": "TIGER 레버리지",
+"issuer": "TIGER",
+"reti": "0"
+},
+"396500": {
+"name": "TIGER 반도체TOP10",
+"issuer": "TIGER",
+"reti": "70"
+},
+"471780": {
+"name": "TIGER 코리아테크액티브",
+"issuer": "TIGER",
+"reti": "70"
+},
+"414780": {
+"name": "TIGER 차이나과창판STAR50(합성)",
+"issuer": "TIGER",
+"reti": "70"
+},
+"091230": {
+"name": "TIGER 반도체",
+"issuer": "TIGER",
+"reti": "70"
+},
+"396520": {
+"name": "TIGER 차이나반도체FACTSET",
+"issuer": "TIGER",
+"reti": "70"
+},
+"261060": {
+"name": "TIGER 코스닥150 IT",
+"issuer": "TIGER",
+"reti": "70"
+},
+"139260": {
+"name": "TIGER 200 IT",
+"issuer": "TIGER",
+"reti": "70"
+},
+"233160": {
+"name": "TIGER 코스닥150 레버리지",
+"issuer": "TIGER",
+"reti": "0"
+},
+"371470": {
+"name": "TIGER 차이나바이오테크 SOLACTIVE",
+"issuer": "TIGER",
+"reti": "70"
+},
+"471760": {
+"name": "TIGER AI반도체핵심공정",
+"issuer": "TIGER",
+"reti": "70"
+},
+"423920": {
+"name": "TIGER 미국필라델피아반도체레버리지(합성)",
+"issuer": "TIGER",
+"reti": "0"
+},
+"310970": {
+"name": "TIGER MSCI KOREA TR",
+"issuer": "TIGER",
+"reti": "70"
+},
+"418660": {
+"name": "TIGER 미국나스닥100레버리지(합성)",
+"issuer": "TIGER",
+"reti": "0"
+},
+"472150": {
+"name": "TIGER 배당커버드콜액티브",
+"issuer": "TIGER",
+"reti": "70"
+},
+"449690": {
+"name": "TIGER 한중반도체(합성)",
+"issuer": "TIGER",
+"reti": "70"
+},
+"310960": {
+"name": "TIGER 200 TR",
+"issuer": "TIGER",
+"reti": "70"
+},
+"102110": {
+"name": "TIGER 200",
+"issuer": "TIGER",
+"reti": "70"
+},
+"412770": {
+"name": "TIGER 글로벌AI플랫폼액티브",
+"issuer": "TIGER",
+"reti": "70"
+},
+"292160": {
+"name": "TIGER KRX300",
+"issuer": "TIGER",
+"reti": "70"
+},
+"204480": {
+"name": "TIGER 차이나CSI300 레버리지(합성)",
+"issuer": "TIGER",
+"reti": "0"
+},
+"371450": {
+"name": "TIGER 글로벌클라우드컴퓨팅INDXX",
+"issuer": "TIGER",
+"reti": "70"
+},
+"166400": {
+"name": "TIGER 200 커버드콜OTM",
+"issuer": "TIGER",
+"reti": "70"
+},
+"466950": {
+"name": "TIGER 글로벌AI액티브",
+"issuer": "TIGER",
+"reti": "70"
+},
+"480310": {
+"name": "TIGER 글로벌온디바이스AI",
+"issuer": "TIGER",
+"reti": "70"
+},
+"277640": {
+"name": "TIGER 코스피대형주",
+"issuer": "TIGER",
+"reti": "70"
+},
+"261110": {
+"name": "TIGER 미국달러선물레버리지",
+"issuer": "TIGER",
+"reti": "0"
+},
+"491830": {
+"name": "TIGER 미국AI반도체팹리스",
+"issuer": "TIGER",
+"reti": "70"
+},
+"476690": {
+"name": "TIGER 글로벌비만치료제TOP2 Plus",
+"issuer": "TIGER",
+"reti": "70"
+},
+"289250": {
+"name": "TIGER MSCI KOREA ESG 유니버설",
+"issuer": "TIGER",
+"reti": "70"
+},
+"277630": {
+"name": "TIGER 코스피",
+"issuer": "TIGER",
+"reti": "70"
+},
+"365040": {
+"name": "TIGER AI코리아그로스액티브",
+"issuer": "TIGER",
+"reti": "70"
+},
+"289480": {
+"name": "TIGER 200 커버드콜",
+"issuer": "TIGER",
+"reti": "70"
+},
+"465660": {
+"name": "TIGER 일본반도체FACTSET",
+"issuer": "TIGER",
+"reti": "70"
+},
+"376410": {
+"name": "TIGER 탄소효율그린뉴딜",
+"issuer": "TIGER",
+"reti": "70"
+},
+"292150": {
+"name": "TIGER 코리아TOP10",
+"issuer": "TIGER",
+"reti": "70"
+},
+"396510": {
+"name": "TIGER 차이나클린에너지SOLACTIVE",
+"issuer": "TIGER",
+"reti": "70"
+},
+"160580": {
+"name": "TIGER 구리실물",
+"issuer": "TIGER",
+"reti": "70"
+},
+"371160": {
+"name": "TIGER 차이나항셍테크",
+"issuer": "TIGER",
+"reti": "70"
+},
+"387270": {
+"name": "TIGER 글로벌이노베이션액티브",
+"issuer": "TIGER",
+"reti": "70"
+},
+"248270": {
+"name": "TIGER S&P 글로벌헬스케어(합성)",
+"issuer": "TIGER",
+"reti": "70"
+},
+"456680": {
+"name": "TIGER 차이나전기차레버리지(합성)",
+"issuer": "TIGER",
+"reti": "0"
+},
+"474220": {
+"name": "TIGER 미국테크TOP10타겟커버드콜",
+"issuer": "TIGER",
+"reti": "70"
+},
+"236350": {
+"name": "TIGER 인도니프티50 레버리지(합성)",
+"issuer": "TIGER",
+"reti": "0"
+},
+"381170": {
+"name": "TIGER 미국테크TOP10 INDXX",
+"issuer": "TIGER",
+"reti": "70"
+},
+"438320": {
+"name": "TIGER 차이나항셍테크레버리지(합성H)",
+"issuer": "TIGER",
+"reti": "0"
+},
+"289260": {
+"name": "TIGER MSCI KOREA ESG 리더스",
+"issuer": "TIGER",
+"reti": "70"
+},
+"228820": {
+"name": "TIGER KTOP30",
+"issuer": "TIGER",
+"reti": "70"
+},
+"441680": {
+"name": "TIGER 미국나스닥100커버드콜(합성)",
+"issuer": "TIGER",
+"reti": "70"
+},
+"261140": {
+"name": "TIGER 우선주",
+"issuer": "TIGER",
+"reti": "70"
+},
+"497570": {
+"name": "TIGER 미국필라델피아AI반도체나스닥",
+"issuer": "TIGER",
+"reti": "70"
+},
+"486290": {
+"name": "TIGER 미국나스닥100타겟데일리커버드콜",
+"issuer": "TIGER",
+"reti": "70"
+},
+"133690": {
+"name": "TIGER 미국나스닥100",
+"issuer": "TIGER",
+"reti": "70"
+},
+"381180": {
+"name": "TIGER 미국필라델피아반도체나스닥",
+"issuer": "TIGER",
+"reti": "70"
+},
+"232080": {
+"name": "TIGER 코스닥150",
+"issuer": "TIGER",
+"reti": "70"
+},
+"490090": {
+"name": "TIGER 미국AI빅테크10",
+"issuer": "TIGER",
+"reti": "70"
+},
+"493810": {
+"name": "TIGER 미국AI빅테크10타겟데일리커버드콜",
+"issuer": "TIGER",
+"reti": "70"
+},
+"496080": {
+"name": "TIGER 코리아밸류업",
+"issuer": "TIGER",
+"reti": "70"
+},
+"464930": {
+"name": "TIGER 글로벌혁신블루칩TOP10",
+"issuer": "TIGER",
+"reti": "70"
+},
+"203780": {
+"name": "TIGER 미국나스닥바이오",
+"issuer": "TIGER",
+"reti": "70"
+},
+"451530": {
+"name": "TIGER 국고채30년스트립액티브",
+"issuer": "TIGER",
+"reti": "100"
+},
+"192090": {
+"name": "TIGER 차이나CSI300",
+"issuer": "TIGER",
+"reti": "70"
+},
+"464310": {
+"name": "TIGER 글로벌AI&로보틱스INDXX",
+"issuer": "TIGER",
+"reti": "70"
+},
+"329750": {
+"name": "TIGER 미국달러단기채권액티브",
+"issuer": "TIGER",
+"reti": "100"
+},
+"456610": {
+"name": "TIGER 미국달러SOFR금리액티브(합성)",
+"issuer": "TIGER",
+"reti": "70"
+},
+"138520": {
+"name": "TIGER 삼성그룹",
+"issuer": "TIGER",
+"reti": "70"
+},
+"482730": {
+"name": "TIGER 미국S&P500타겟데일리커버드콜",
+"issuer": "TIGER",
+"reti": "70"
+},
+"360750": {
+"name": "TIGER 미국S&P500",
+"issuer": "TIGER",
+"reti": "70"
+},
+"371460": {
+"name": "TIGER 차이나전기차 SOLACTIVE",
+"issuer": "TIGER",
+"reti": "70"
+},
+"453950": {
+"name": "TIGER TSMC파운드리밸류체인",
+"issuer": "TIGER",
+"reti": "70"
+},
+"305080": {
+"name": "TIGER 미국채10년선물",
+"issuer": "TIGER",
+"reti": "0"
+},
+"241180": {
+"name": "TIGER 일본니케이225",
+"issuer": "TIGER",
+"reti": "70"
+},
+"429010": {
+"name": "TIGER 미국나스닥넥스트100",
+"issuer": "TIGER",
+"reti": "70"
+},
+"453870": {
+"name": "TIGER 인도니프티50",
+"issuer": "TIGER",
+"reti": "70"
+},
+"245360": {
+"name": "TIGER 차이나HSCEI",
+"issuer": "TIGER",
+"reti": "70"
+},
+"472170": {
+"name": "TIGER미국테크TOP10채권혼합",
+"issuer": "TIGER",
+"reti": "100"
+},
+"440340": {
+"name": "TIGER 글로벌멀티에셋TIF액티브",
+"issuer": "TIGER",
+"reti": "100"
+},
+"494840": {
+"name": "TIGER 미국방산TOP10",
+"issuer": "TIGER",
+"reti": "70"
+},
+"479730": {
+"name": "TIGER 인도빌리언컨슈머",
+"issuer": "TIGER",
+"reti": "70"
+},
+"435420": {
+"name": "TIGER 미국나스닥100채권혼합50",
+"issuer": "TIGER",
+"reti": "100"
+},
+"117690": {
+"name": "TIGER 차이나항셍30",
+"issuer": "TIGER",
+"reti": "70"
+},
+"195920": {
+"name": "TIGER 일본TOPIX (합성 H)",
+"issuer": "TIGER",
+"reti": "70"
+},
+"472160": {
+"name": "TIGER 미국테크TOP10INDXX(H)",
+"issuer": "TIGER",
+"reti": "70"
+},
+"429000": {
+"name": "TIGER 미국S&P500배당귀족",
+"issuer": "TIGER",
+"reti": "70"
+},
+"458760": {
+"name": "TIGER 미국배당다우존스타겟커버드콜2호",
+"issuer": "TIGER",
+"reti": "70"
+},
+"245350": {
+"name": "TIGER 유로스탁스배당30",
+"issuer": "TIGER",
+"reti": "70"
+},
+"458750": {
+"name": "TIGER 미국배당다우존스타겟커버드콜1호",
+"issuer": "TIGER",
+"reti": "70"
+},
+"488500": {
+"name": "TIGER 미국S&P500동일가중",
+"issuer": "TIGER",
+"reti": "70"
+},
+"458250": {
+"name": "TIGER 미국30년국채스트립액티브(합성H)",
+"issuer": "TIGER",
+"reti": "100"
+},
+"458730": {
+"name": "TIGER 미국배당다우존스",
+"issuer": "TIGER",
+"reti": "70"
+},
+"269370": {
+"name": "TIGER S&P글로벌인프라(합성)",
+"issuer": "TIGER",
+"reti": "70"
+},
+"491010": {
+"name": "TIGER 글로벌AI전력인프라액티브",
+"issuer": "TIGER",
+"reti": "70"
+},
+"394670": {
+"name": "TIGER 글로벌리튬&2차전지SOLACTIVE(합성)",
+"issuer": "TIGER",
+"reti": "70"
+},
+"448300": {
+"name": "TIGER 미국나스닥100(H)",
+"issuer": "TIGER",
+"reti": "70"
+},
+"387280": {
+"name": "TIGER 퓨처모빌리티액티브",
+"issuer": "TIGER",
+"reti": "70"
+},
+"465670": {
+"name": "TIGER 미국캐시카우100",
+"issuer": "TIGER",
+"reti": "70"
+},
+"447770": {
+"name": "TIGER 테슬라채권혼합Fn",
+"issuer": "TIGER",
+"reti": "100"
+},
+"245340": {
+"name": "TIGER 미국다우존스30",
+"issuer": "TIGER",
+"reti": "70"
+},
+"461580": {
+"name": "TIGER 코스닥글로벌",
+"issuer": "TIGER",
+"reti": "70"
+},
+"275980": {
+"name": "TIGER 글로벌4차산업혁신기술(합성 H)",
+"issuer": "TIGER",
+"reti": "70"
+},
+"476550": {
+"name": "TIGER 미국30년국채커버드콜액티브(H)",
+"issuer": "TIGER",
+"reti": "100"
+},
+"307510": {
+"name": "TIGER 의료기기",
+"issuer": "TIGER",
+"reti": "70"
+},
+"139320": {
+"name": "TIGER 금은선물(H)",
+"issuer": "TIGER",
+"reti": "0"
+},
+"292560": {
+"name": "TIGER 일본엔선물",
+"issuer": "TIGER",
+"reti": "0"
+},
+"394660": {
+"name": "TIGER 글로벌자율주행&전기차 SOLACTIVE",
+"issuer": "TIGER",
+"reti": "70"
+},
+"319640": {
+"name": "TIGER 골드선물(H)",
+"issuer": "TIGER",
+"reti": "0"
+},
+"458260": {
+"name": "TIGER 미국투자등급회사채액티브(H)",
+"issuer": "TIGER",
+"reti": "100"
+},
+"451540": {
+"name": "TIGER 종합채권(AA-이상)액티브",
+"issuer": "TIGER",
+"reti": "100"
+},
+"365000": {
+"name": "TIGER 인터넷TOP10",
+"issuer": "TIGER",
+"reti": "70"
+},
+"302190": {
+"name": "TIGER 중장기국채",
+"issuer": "TIGER",
+"reti": "100"
+},
+"225030": {
+"name": "TIGER 미국S&P500 선물인버스(H)",
+"issuer": "TIGER",
+"reti": "0"
+},
+"130680": {
+"name": "TIGER 원유선물Enhanced(H)",
+"issuer": "TIGER",
+"reti": "0"
+},
+"357870": {
+"name": "TIGER CD금리투자KIS(합성)",
+"issuer": "TIGER",
+"reti": "70"
+},
+"499660": {
+"name": "TIGER CD금리플러스액티브(합성)",
+"issuer": "TIGER",
+"reti": "100"
+},
+"449170": {
+"name": "TIGER KOFR금리액티브(합성)",
+"issuer": "TIGER",
+"reti": "100"
+},
+"139240": {
+"name": "TIGER 200 철강소재",
+"issuer": "TIGER",
+"reti": "70"
+},
+"475630": {
+"name": "TIGER CD1년금리액티브(합성)",
+"issuer": "TIGER",
+"reti": "100"
+},
+"114820": {
+"name": "TIGER 국채3년",
+"issuer": "TIGER",
+"reti": "100"
+},
+"272580": {
+"name": "TIGER 단기채권액티브",
+"issuer": "TIGER",
+"reti": "100"
+},
+"105010": {
+"name": "TIGER 라틴35",
+"issuer": "TIGER",
+"reti": "70"
+},
+"157450": {
+"name": "TIGER 단기통안채",
+"issuer": "TIGER",
+"reti": "100"
+},
+"480260": {
+"name": "TIGER 27-04회사채(A+이상)액티브",
+"issuer": "TIGER",
+"reti": "100"
+},
+"438330": {
+"name": "TIGER 우량회사채액티브",
+"issuer": "TIGER",
+"reti": "100"
+},
+"448290": {
+"name": "TIGER 미국S&P500(H)",
+"issuer": "TIGER",
+"reti": "70"
+},
+"143850": {
+"name": "TIGER 미국S&P500 선물(H)",
+"issuer": "TIGER",
+"reti": "0"
+},
+"143860": {
+"name": "TIGER 헬스케어",
+"issuer": "TIGER",
+"reti": "70"
+},
+"182490": {
+"name": "TIGER 단기선진하이일드(합성 H)",
+"issuer": "TIGER",
+"reti": "70"
+},
+"341850": {
+"name": "TIGER 리츠부동산인프라채권",
+"issuer": "TIGER",
+"reti": "70"
+},
+"147970": {
+"name": "TIGER 모멘텀",
+"issuer": "TIGER",
+"reti": "70"
+},
+"139220": {
+"name": "TIGER 200 건설",
+"issuer": "TIGER",
+"reti": "70"
+},
+"225040": {
+"name": "TIGER 미국S&P500 레버리지(합성 H)",
+"issuer": "TIGER",
+"reti": "0"
+},
+"237440": {
+"name": "TIGER 경기방어채권혼합",
+"issuer": "TIGER",
+"reti": "100"
+},
+"329200": {
+"name": "TIGER 리츠부동산인프라",
+"issuer": "TIGER",
+"reti": "70"
+},
+"217770": {
+"name": "TIGER 원유선물인버스(H)",
+"issuer": "TIGER",
+"reti": "0"
+},
+"305540": {
+"name": "TIGER 2차전지테마",
+"issuer": "TIGER",
+"reti": "70"
+},
+"377990": {
+"name": "TIGER Fn신재생에너지",
+"issuer": "TIGER",
+"reti": "70"
+},
+"417630": {
+"name": "TIGER KEDI혁신기업ESG30",
+"issuer": "TIGER",
+"reti": "70"
+},
+"227540": {
+"name": "TIGER 200 헬스케어",
+"issuer": "TIGER",
+"reti": "70"
+},
+"364970": {
+"name": "TIGER 바이오TOP10",
+"issuer": "TIGER",
+"reti": "70"
+},
+"261070": {
+"name": "TIGER 코스닥150 바이오테크",
+"issuer": "TIGER",
+"reti": "70"
+},
+"364980": {
+"name": "TIGER 2차전지TOP10",
+"issuer": "TIGER",
+"reti": "70"
+},
+"227550": {
+"name": "TIGER 200 산업재",
+"issuer": "TIGER",
+"reti": "70"
+},
+"404540": {
+"name": "TIGER KRX기후변화솔루션",
+"issuer": "TIGER",
+"reti": "70"
+},
+"449680": {
+"name": "TIGER 한중전기차(합성)",
+"issuer": "TIGER",
+"reti": "70"
+},
+"307520": {
+"name": "TIGER 지주회사",
+"issuer": "TIGER",
+"reti": "70"
+},
+"139280": {
+"name": "TIGER 경기방어",
+"issuer": "TIGER",
+"reti": "70"
+},
+"137610": {
+"name": "TIGER 농산물선물Enhanced(H)",
+"issuer": "TIGER",
+"reti": "0"
+},
+"277650": {
+"name": "TIGER 코스피중형주",
+"issuer": "TIGER",
+"reti": "70"
+},
+"195930": {
+"name": "TIGER 유로스탁스50 (합성 H)",
+"issuer": "TIGER",
+"reti": "70"
+},
+"462010": {
+"name": "TIGER 2차전지소재Fn",
+"issuer": "TIGER",
+"reti": "70"
+},
+"228790": {
+"name": "TIGER 화장품",
+"issuer": "TIGER",
+"reti": "70"
+},
+"445910": {
+"name": "TIGER MKF배당귀족",
+"issuer": "TIGER",
+"reti": "70"
+},
+"225060": {
+"name": "TIGER 이머징마켓MSCI 레버리지(합성H)",
+"issuer": "TIGER",
+"reti": "0"
+},
+"412570": {
+"name": "TIGER 2차전지TOP10레버리지",
+"issuer": "TIGER",
+"reti": "0"
+},
+"463250": {
+"name": "TIGER K방산&우주",
+"issuer": "TIGER",
+"reti": "70"
+},
+"227560": {
+"name": "TIGER 200 생활소비재",
+"issuer": "TIGER",
+"reti": "70"
+},
+"138530": {
+"name": "TIGER LG그룹플러스",
+"issuer": "TIGER",
+"reti": "70"
+},
+"252000": {
+"name": "TIGER 200 동일가중",
+"issuer": "TIGER",
+"reti": "70"
+},
+"182480": {
+"name": "TIGER 미국MSCI리츠(합성 H)",
+"issuer": "TIGER",
+"reti": "70"
+},
+"228810": {
+"name": "TIGER 미디어컨텐츠",
+"issuer": "TIGER",
+"reti": "70"
+},
+"276000": {
+"name": "TIGER 글로벌자원생산기업(합성 H)",
+"issuer": "TIGER",
+"reti": "70"
+},
+"364960": {
+"name": "TIGER BBIG",
+"issuer": "TIGER",
+"reti": "70"
+},
+"157490": {
+"name": "TIGER 소프트웨어",
+"issuer": "TIGER",
+"reti": "70"
+},
+"210780": {
+"name": "TIGER 코스피고배당",
+"issuer": "TIGER",
+"reti": "70"
+},
+"139230": {
+"name": "TIGER 200 중공업",
+"issuer": "TIGER",
+"reti": "70"
+},
+"211560": {
+"name": "TIGER 배당성장",
+"issuer": "TIGER",
+"reti": "70"
+},
+"139250": {
+"name": "TIGER 200 에너지화학",
+"issuer": "TIGER",
+"reti": "70"
+},
+"091220": {
+"name": "TIGER 은행",
+"issuer": "TIGER",
+"reti": "70"
+},
+"227570": {
+"name": "TIGER 우량가치",
+"issuer": "TIGER",
+"reti": "70"
+},
+"139270": {
+"name": "TIGER 200 금융",
+"issuer": "TIGER",
+"reti": "70"
+},
+"217780": {
+"name": "TIGER 차이나CSI300 인버스(합성)",
+"issuer": "TIGER",
+"reti": "0"
+},
+"466940": {
+"name": "TIGER 은행고배당플러스TOP10",
+"issuer": "TIGER",
+"reti": "70"
+},
+"364990": {
+"name": "TIGER 게임TOP10",
+"issuer": "TIGER",
+"reti": "70"
+},
+"157500": {
+"name": "TIGER 증권",
+"issuer": "TIGER",
+"reti": "70"
+},
+"150460": {
+"name": "TIGER 중국소비테마",
+"issuer": "TIGER",
+"reti": "70"
+},
+"225050": {
+"name": "TIGER 유로스탁스50 레버리지(합성H)",
+"issuer": "TIGER",
+"reti": "0"
+},
+"138540": {
+"name": "TIGER 현대차그룹플러스",
+"issuer": "TIGER",
+"reti": "70"
+},
+"174350": {
+"name": "TIGER 로우볼",
+"issuer": "TIGER",
+"reti": "70"
+},
+"400970": {
+"name": "TIGER Fn메타버스",
+"issuer": "TIGER",
+"reti": "70"
+},
+"315270": {
+"name": "TIGER 200 커뮤니케이션서비스",
+"issuer": "TIGER",
+"reti": "70"
+},
+"300610": {
+"name": "TIGER K게임",
+"issuer": "TIGER",
+"reti": "70"
+},
+"139290": {
+"name": "TIGER 200 경기소비재",
+"issuer": "TIGER",
+"reti": "70"
+},
+"250780": {
+"name": "TIGER 코스닥150 선물인버스",
+"issuer": "TIGER",
+"reti": "0"
+},
+"228800": {
+"name": "TIGER 여행레저",
+"issuer": "TIGER",
+"reti": "70"
+},
+"412560": {
+"name": "TIGER BBIG 레버리지",
+"issuer": "TIGER",
+"reti": "0"
+},
+"261120": {
+"name": "TIGER 미국달러선물인버스2X",
+"issuer": "TIGER",
+"reti": "0"
+},
+"243890": {
+"name": "TIGER 200 에너지화학레버리지",
+"issuer": "TIGER",
+"reti": "0"
+},
+"494670": {
+"name": "TIGER 조선TOP10",
+"issuer": "TIGER",
+"reti": "70"
+},
+"123310": {
+"name": "TIGER 인버스",
+"issuer": "TIGER",
+"reti": "0"
+},
+"252710": {
+"name": "TIGER 200 선물인버스2X",
+"issuer": "TIGER",
+"reti": "0"
+}
+}

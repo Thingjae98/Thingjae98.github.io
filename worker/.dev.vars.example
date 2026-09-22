@@ -1,0 +1,5 @@
+# 로컬 개발용. 이 파일을 .dev.vars 로 복사해 값을 채운다 (.dev.vars 는 git 에 올리지 않음)
+GEMINI_API_KEY=
+VAPID_PUBLIC=
+VAPID_PRIVATE_JWK=
+KRX_AUTH_KEY=

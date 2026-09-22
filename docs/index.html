@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>가족 비서</title>
+  <meta name="description" content="퇴직연금 ETF 매매를 돕는 가족 전용 비서">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="config.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+
+  <!-- 잠금 화면 -->
+  <section id="lock" class="lock" hidden>
+    <div class="lock-card">
+      <div class="lock-mark" aria-hidden="true">
+        <svg viewBox="0 0 48 48" width="56" height="56"><circle cx="24" cy="24" r="22" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M15 26c3 5 6 7 9 7s6-2 9-7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><circle cx="18" cy="19" r="1.8" fill="currentColor"/><circle cx="30" cy="19" r="1.8" fill="currentColor"/></svg>
+      </div>
+      <h1 id="lock-title">가족 비서</h1>
+      <p id="lock-sub" class="muted">초대 코드와 비밀번호 4자리를 넣어주세요.</p>
+      <form id="lock-form" autocomplete="off">
+        <label class="field">
+          <span>초대 코드</span>
+          <input id="lock-handle" type="text" inputmode="latin" autocapitalize="characters" maxlength="8" spellcheck="false" placeholder="예: ABC123" required>
+        </label>
+        <label class="field">
+          <span id="lock-pin-label">비밀번호 4자리</span>
+          <input id="lock-pin" type="password" inputmode="numeric" pattern="\d{4}" maxlength="4" placeholder="••••" required>
+        </label>
+        <p id="lock-error" class="error" role="alert" hidden></p>
+        <button id="lock-submit" type="submit" class="btn primary wide">들어가기</button>
+      </form>
+      <button id="lock-mode" type="button" class="btn ghost wide">처음이에요 (비밀번호 만들기)</button>
+    </div>
+  </section>
+
+  <!-- 앱 -->
+  <div id="app" class="app" hidden>
+    <aside class="side" aria-label="주 메뉴">
+      <div class="side-head">
+        <span class="side-agent" id="side-agent">비서</span>
+        <span class="side-user muted" id="side-user"></span>
+      </div>
+      <nav class="nav" id="nav-side"></nav>
+      <p class="side-foot muted">주문은 증권사 앱에서 직접 하세요.<br>이 앱은 판단 재료만 드립니다.</p>
+    </aside>
+
+    <main id="main" class="main">
+      <header class="top">
+        <h1 class="top-title" id="top-title">대화</h1>
+        <button id="top-action" class="btn ghost small" type="button" hidden></button>
+      </header>
+
+      <!-- 대화 -->
+      <section id="view-chat" class="view" data-view="chat">
+        <div id="chat-log" class="chat-log" aria-live="polite" aria-relevant="additions"></div>
+        <div class="chips" id="chips">
+          <button class="chip" type="button" data-q="오늘 일정 알려줘">오늘 일정</button>
+          <button class="chip" type="button" data-q="내 보유 종목 지금 어때?">보유 종목</button>
+          <button class="chip" type="button" data-q="오늘 증시 뉴스 세 줄로 요약해줘">증시 뉴스</button>
+          <button class="chip" type="button" data-q="퇴직연금 계좌에서 살 수 있는지 확인하고 싶은 종목이 있어">퇴직연금 되나?</button>
+        </div>
+        <form id="chat-form" class="composer">
+          <div id="attach-preview" class="attach-preview" hidden>
+            <img id="attach-img" alt="첨부한 캡처 미리보기">
+            <button type="button" id="attach-remove" class="btn ghost small" aria-label="첨부 제거">제거</button>
+          </div>
+          <div class="composer-row">
+            <label class="icon-btn" title="증권사 앱 캡처 올리기">
+              <input id="attach" type="file" accept="image/*" hidden>
+              <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M4 7h3l2-3h6l2 3h3v12H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+              <span class="sr">사진 첨부</span>
+            </label>
+            <textarea id="chat-input" rows="1" placeholder="무엇이든 물어보세요" aria-label="메시지 입력"></textarea>
+            <button id="chat-send" class="btn primary send" type="submit" aria-label="보내기">
+              <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M4 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- 자산 -->
+      <section id="view-assets" class="view" data-view="assets" hidden>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>위험자산 비중</h2>
+            <span class="muted">한도 70%</span>
+          </div>
+          <div class="meter" role="img" id="risk-meter" aria-label="위험자산 비중">
+            <div class="meter-fill" id="risk-fill"></div>
+            <div class="meter-limit" aria-hidden="true"></div>
+          </div>
+          <p class="meter-text" id="risk-text">전체 적립금을 입력하면 비중을 계산합니다.</p>
+          <form id="balance-form" class="inline-form">
+            <label class="field grow">
+              <span>퇴직연금 전체 적립금 (원)</span>
+              <input id="balance-input" type="text" inputmode="numeric" placeholder="예: 150,000,000">
+            </label>
+            <button class="btn secondary" type="submit">저장</button>
+          </form>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>보유 종목</h2><span class="muted" id="holdings-updated"></span></div>
+          <div id="holdings-list" class="list"></div>
+          <p class="hint">대화에서 "KODEX 200 100주 보유"처럼 말하면 여기에 쌓입니다. 증권사 캡처를 올려도 됩니다.</p>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>매매일지</h2></div>
+          <div id="trades-list" class="list"></div>
+        </div>
+      </section>
+
+      <!-- 일정 -->
+      <section id="view-events" class="view" data-view="events" hidden>
+        <div class="panel">
+          <div class="panel-head"><h2>다가오는 일정</h2></div>
+          <div id="events-list" class="list"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>일정 추가</h2></div>
+          <form id="event-form" class="stack">
+            <label class="field"><span>제목</span><input id="ev-title" type="text" placeholder="예: 탁구 동호회" required></label>
+            <div class="row2">
+              <label class="field"><span>날짜</span><input id="ev-date" type="date" required></label>
+              <label class="field"><span>시각</span><input id="ev-time" type="time" required></label>
+            </div>
+            <div class="row2">
+              <label class="field"><span>반복</span>
+                <select id="ev-repeat"><option value="none">한 번만</option><option value="weekly">매주</option><option value="daily">매일</option></select>
+              </label>
+              <label class="field"><span>알림</span>
+                <select id="ev-remind"><option value="0">정각에</option><option value="30" selected>30분 전</option><option value="60">1시간 전</option><option value="1440">하루 전</option></select>
+              </label>
+            </div>
+            <button class="btn primary" type="submit">저장</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- 설정 -->
+      <section id="view-settings" class="view" data-view="settings" hidden>
+        <div class="panel">
+          <div class="panel-head"><h2>비서 이름과 말투</h2></div>
+          <form id="settings-form" class="stack">
+            <label class="field"><span>비서 이름</span><input id="s-agent" type="text" maxlength="12" required></label>
+            <div class="row2">
+              <label class="field"><span>내 이름</span><input id="s-name" type="text" maxlength="12" required></label>
+              <label class="field"><span>호칭</span>
+                <select id="s-honorific"><option value="님">님</option><option value=" 어르신"> 어르신</option><option value=" 아버님"> 아버님</option><option value=" 어머님"> 어머님</option><option value=" 선생님"> 선생님</option><option value="">(이름만)</option></select>
+              </label>
+            </div>
+            <label class="field"><span>말투</span>
+              <select id="s-tone-preset">
+                <option value="존댓말로, 두세 문장 이내로 짧게, 어려운 용어는 처음 나올 때 괄호로 풀어서">공손하고 짧게 (기본)</option>
+                <option value="존댓말로, 차분하고 자세하게. 근거를 표로 정리해서">차분하고 자세하게</option>
+                <option value="친근한 존댓말로, 가족처럼 편하게. 짧게">가족처럼 편하게</option>
+                <option value="custom">직접 쓰기</option>
+              </select>
+            </label>
+            <label class="field" id="s-tone-custom-wrap" hidden><span>말투 직접 쓰기</span><textarea id="s-tone" rows="2" maxlength="200"></textarea></label>
+            <button class="btn primary" type="submit">저장</button>
+          </form>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>알림</h2></div>
+          <div class="switch-row">
+            <div>
+              <div class="switch-title">일정 알림 받기</div>
+              <div class="muted small">밤 10시부터 아침 7시까지는 보내지 않습니다. 하루 최대 10건.</div>
+            </div>
+            <button id="push-toggle" class="switch" type="button" role="switch" aria-checked="false" aria-label="일정 알림"><span class="knob"></span></button>
+          </div>
+          <div class="btn-row">
+            <button id="push-test" class="btn secondary" type="button">알림 테스트</button>
+            <button id="install-btn" class="btn secondary" type="button" hidden>홈 화면에 추가</button>
+          </div>
+          <p id="push-status" class="hint"></p>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>비서가 기억하는 것</h2></div>
+          <div id="memories-list" class="list"></div>
+          <p class="hint">대화 중 말씀하신 투자 원칙이나 선호를 비서가 여기 적어둡니다. 틀리면 지우세요.</p>
+        </div>
+
+        <div class="panel danger-zone">
+          <div class="btn-row">
+            <button id="clear-chat" class="btn ghost" type="button">대화 기록 지우기</button>
+            <button id="logout" class="btn ghost" type="button">이 기기에서 로그아웃</button>
+          </div>
+          <p class="hint">코드 <span id="s-handle" class="mono"></span> · 서버 <span id="s-api" class="mono"></span></p>
+        </div>
+      </section>
+    </main>
+
+    <nav class="tabbar" id="nav-bottom" aria-label="화면 이동"></nav>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+// Gemini generateContent + 함수 호출 루프
+const API = "https://generativelanguage.googleapis.com/v1beta/models";
+
+export const TOOL_DECLS = [
+  { name: "get_quote", description: "국내 주식·ETF 현재가와 퇴직연금 계좌 투자가능 판정을 가져온다. 종목명 일부나 코드로 검색.", parameters: { type: "OBJECT", properties: { query: { type: "STRING", description: "종목명 또는 6자리 코드" } }, required: ["query"] } },
+  { name: "simulate_buy", description: "특정 종목을 주어진 수량 사면 위험자산 비중(70% 한도)이 얼마가 되는지 계산한다.", parameters: { type: "OBJECT", properties: { query: { type: "STRING" }, qty: { type: "INTEGER" } }, required: ["query", "qty"] } },
+  { name: "list_holdings", description: "사용자의 보유 종목 목록과 현재 위험자산 비중을 가져온다.", parameters: { type: "OBJECT", properties: {} } },
+  { name: "set_holding", description: "보유 종목을 등록하거나 수량·평단을 갱신한다(같은 종목이 있으면 덮어씀). 수량 0이면 삭제.", parameters: { type: "OBJECT", properties: { query: { type: "STRING", description: "종목명 또는 코드" }, qty: { type: "INTEGER" }, avg_price: { type: "INTEGER", description: "평균 매수가(원), 모르면 생략" } }, required: ["query", "qty"] } },
+  { name: "set_total_balance", description: "퇴직연금 계좌 전체 적립금(원)을 저장한다. 70% 한도 계산에 쓰인다.", parameters: { type: "OBJECT", properties: { amount: { type: "INTEGER" } }, required: ["amount"] } },
+  { name: "add_trade", description: "매매일지에 매수/매도 기록을 남긴다. 이유·목표가·손절선은 사용자가 말했을 때만 넣는다.", parameters: { type: "OBJECT", properties: { query: { type: "STRING" }, side: { type: "STRING", enum: ["buy", "sell"] }, qty: { type: "INTEGER" }, price: { type: "INTEGER" }, trade_date: { type: "STRING", description: "YYYY-MM-DD, 생략 시 오늘" }, reason: { type: "STRING" }, target_price: { type: "INTEGER" }, stop_price: { type: "INTEGER" } }, required: ["query", "side", "qty", "price"] } },
+  { name: "list_trades", description: "매매일지를 기간으로 조회한다(복기용).", parameters: { type: "OBJECT", properties: { from: { type: "STRING", description: "YYYY-MM-DD" }, to: { type: "STRING" } } } },
+  { name: "add_event", description: "일정을 추가한다. 반복 일정(매주 미사·탁구)은 repeat 지정.", parameters: { type: "OBJECT", properties: { title: { type: "STRING" }, start_at: { type: "STRING", description: "YYYY-MM-DD HH:MM 한국시간" }, repeat: { type: "STRING", enum: ["none", "daily", "weekly"] }, remind_min: { type: "INTEGER", description: "몇 분 전에 알릴지, 기본 30" } }, required: ["title", "start_at"] } },
+  { name: "list_events", description: "다가오는 일정을 가져온다.", parameters: { type: "OBJECT", properties: { days: { type: "INTEGER", description: "며칠치, 기본 7" } } } },
+  { name: "delete_event", description: "일정을 삭제한다.", parameters: { type: "OBJECT", properties: { id: { type: "INTEGER" } }, required: ["id"] } },
+  { name: "save_memory", description: "사용자가 말한 투자 원칙·선호·관심사처럼 다음 대화에도 기억해야 할 사실을 한 줄로 저장한다.", parameters: { type: "OBJECT", properties: { content: { type: "STRING" } }, required: ["content"] } },
+  { name: "search_news", description: "최근 뉴스 제목 목록을 가져온다(경제·증시·종목). 요약은 결과를 바탕으로 직접 한다.", parameters: { type: "OBJECT", properties: { query: { type: "STRING" } }, required: ["query"] } },
+];
+
+/**
+ * @param {object} p  { system, history:[{role,parts}], userParts:[...], runTool:(name,args)=>Promise<object>, env }
+ * @returns {Promise<{text:string, usage:{in:number,out:number}, calls:string[]}>}
+ */
+export async function chat({ system, history, userParts, runTool, env }) {
+  const model = env.GEMINI_MODEL || "gemini-3.8-flash";
+  const contents = [...history, { role: "user", parts: userParts }];
+  const usage = { in: 0, out: 0 };
+  const calls = [];
+  for (let i = 0; i < 6; i++) {
+    const r = await fetch(`${API}/${model}:generateContent?key=${env.GEMINI_API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents,
+        tools: [{ functionDeclarations: TOOL_DECLS }],
+        generationConfig: { temperature: 0.4, maxOutputTokens: 1500 },
+      }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(`Gemini ${r.status}: ${j.error?.message || ""}`);
+    usage.in += j.usageMetadata?.promptTokenCount || 0;
+    usage.out += j.usageMetadata?.candidatesTokenCount || 0;
+    const parts = j.candidates?.[0]?.content?.parts || [];
+    const fcalls = parts.filter((p) => p.functionCall);
+    if (!fcalls.length) {
+      return { text: parts.map((p) => p.text || "").join("").trim() || "(답변을 만들지 못했습니다)", usage, calls };
+    }
+    contents.push({ role: "model", parts });
+    const responses = [];
+    for (const { functionCall: fc } of fcalls) {
+      calls.push(fc.name);
+      let out;
+      try { out = await runTool(fc.name, fc.args || {}); } catch (e) { out = { error: String(e.message || e) }; }
+      responses.push({ functionResponse: { name: fc.name, response: { result: out } } });
+    }
+    contents.push({ role: "user", parts: responses });
+  }
+  return { text: "도구 호출이 너무 길어져 멈췄습니다. 다시 물어봐 주세요.", usage, calls };
+}
