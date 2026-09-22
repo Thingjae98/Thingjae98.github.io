@@ -387,9 +387,22 @@
   }
   $("#doc-close").addEventListener("click", () => $("#doc-dialog").close());
   $("#doc-pdf").addEventListener("click", () => window.print());
-  $("#doc-pptx").addEventListener("click", () => { try { makePptx(currentDoc); } catch (ex) { toast("발표자료를 만들지 못했습니다. " + ex.message); } });
+  $("#doc-pptx").addEventListener("click", async (e) => {
+    const btn = e.currentTarget; busy(btn, true);
+    try { await makePptx(currentDoc); } catch (ex) { toast("발표자료를 만들지 못했습니다. " + (ex.message || ex)); } finally { busy(btn, false); }
+  });
+  function saveBlob(blob, filename) {
+    // dialog 안에서 만든 링크는 클릭이 막힐 수 있어 body 에 붙여 내려받는다
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
+  }
 
-  function makePptx(doc) {
+  async function makePptx(doc) {
+    if (typeof PptxGenJS !== "function") throw new Error("발표자료 기능을 불러오지 못했습니다. 새로고침 후 다시 해주세요.");
     const P = new PptxGenJS();
     P.layout = "LAYOUT_16x9";
     const FONT = "맑은 고딕", INK = "1F2328", MUTED = "6B7280", BRAND = "A8562A";
@@ -417,7 +430,8 @@
       }
       if (sec.note) sl.addText(sec.note, { x: 0.7, y: 4.85, w: 8.6, h: 0.4, fontSize: 11, color: MUTED, fontFace: FONT, italic: true });
     }
-    P.writeFile({ fileName: (doc.title || "발표자료").replace(/[\\/:*?"<>|]/g, "") + ".pptx" });
+    const blob = await P.write({ outputType: "blob" });
+    saveBlob(blob, (doc.title || "발표자료").replace(/[\\/:*?"<>|]/g, "").slice(0, 60) + ".pptx");
     toast("발표자료를 내려받았습니다.");
   }
 

@@ -68,8 +68,8 @@ function makeToolRunner(user, env, ctx = {}) {
         const q = await getQuote(s.code, env).catch(() => ({ code: s.code, name: s.name || a.query }));
         if (a.qty <= 0) { await db.prepare("DELETE FROM holdings WHERE user_id=? AND code=?").bind(user.id, q.code).run(); return { deleted: q.name }; }
         const ex = await db.prepare("SELECT id FROM holdings WHERE user_id=? AND code=?").bind(user.id, q.code).first();
-        if (ex) await db.prepare("UPDATE holdings SET qty=?, avg_price=COALESCE(?, avg_price), updated_at=datetime('now','localtime') WHERE id=?").bind(a.qty, a.avg_price ?? null, ex.id).run();
-        else await db.prepare("INSERT INTO holdings (user_id, code, name, qty, avg_price) VALUES (?,?,?,?,?)").bind(user.id, q.code, q.name, a.qty, a.avg_price ?? null).run();
+        if (ex) await db.prepare("UPDATE holdings SET qty=?, avg_price=COALESCE(?, avg_price), updated_at=datetime('now','+9 hours') WHERE id=?").bind(a.qty, a.avg_price ?? null, ex.id).run();
+        else await db.prepare("INSERT INTO holdings (user_id, code, name, qty, avg_price, updated_at) VALUES (?,?,?,?,?,datetime('now','+9 hours'))").bind(user.id, q.code, q.name, a.qty, a.avg_price ?? null).run();
         return { saved: { code: q.code, name: q.name, qty: a.qty, avg_price: a.avg_price ?? null } };
       }
       case "set_total_balance":
@@ -80,7 +80,7 @@ function makeToolRunner(user, env, ctx = {}) {
         const s = await resolveSymbol(a.query);
         const name = s.name || (await getQuote(s.code, env).catch(() => ({ name: a.query }))).name;
         const date = a.trade_date || kstStr().slice(0, 10);
-        await db.prepare("INSERT INTO trades (user_id, trade_date, code, name, side, qty, price, reason, target_price, stop_price) VALUES (?,?,?,?,?,?,?,?,?,?)")
+        await db.prepare("INSERT INTO trades (user_id, trade_date, code, name, side, qty, price, reason, target_price, stop_price, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,datetime('now','+9 hours'))")
           .bind(user.id, date, s.code, name, a.side, a.qty, a.price, a.reason ?? null, a.target_price ?? null, a.stop_price ?? null).run();
         return { saved: { date, name, side: a.side, qty: a.qty, price: a.price } };
       }
@@ -90,12 +90,12 @@ function makeToolRunner(user, env, ctx = {}) {
       }
       case "add_event": {
         if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(a.start_at || "")) throw new Error("start_at 은 'YYYY-MM-DD HH:MM' 형식이어야 합니다");
-        const r = await db.prepare("INSERT INTO events (user_id, title, start_at, repeat, remind_min) VALUES (?,?,?,?,?)").bind(user.id, a.title, a.start_at, a.repeat || "none", a.remind_min ?? 30).run();
+        const r = await db.prepare("INSERT INTO events (user_id, title, start_at, repeat, remind_min, created_at) VALUES (?,?,?,?,?,datetime('now','+9 hours'))").bind(user.id, a.title, a.start_at, a.repeat || "none", a.remind_min ?? 30).run();
         return { saved: { id: r.meta.last_row_id, title: a.title, start_at: a.start_at, repeat: a.repeat || "none", remind_min: a.remind_min ?? 30 } };
       }
       case "list_events": return { now: kstStr(), events: await upcomingEvents(user.id, a.days || 7, env) };
       case "delete_event": await db.prepare("DELETE FROM events WHERE id=? AND user_id=?").bind(a.id, user.id).run(); return { deleted: a.id };
-      case "save_memory": await db.prepare("INSERT INTO memories (user_id, content) VALUES (?,?)").bind(user.id, a.content).run(); return { saved: a.content };
+      case "save_memory": await db.prepare("INSERT INTO memories (user_id, content, created_at) VALUES (?,?,datetime('now','+9 hours'))").bind(user.id, a.content).run(); return { saved: a.content };
       case "get_financials": {
         const s = await resolveSymbol(a.query);
         const [fin, met] = await Promise.all([
@@ -187,9 +187,9 @@ async function handleChat(user, body, env) {
   const ctx = {};
   const r = await geminiChat({ system, history: hist, userParts, runTool: makeToolRunner(user, env, ctx), env });
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO messages (user_id, role, content, has_image) VALUES (?,?,?,?)").bind(user.id, "user", text || "(이미지)", image ? 1 : 0),
-    env.DB.prepare("INSERT INTO messages (user_id, role, content) VALUES (?,?,?)").bind(user.id, "model", r.text),
-    env.DB.prepare("INSERT INTO usage_log (user_id, in_tokens, out_tokens) VALUES (?,?,?)").bind(user.id, r.usage.in, r.usage.out),
+    env.DB.prepare("INSERT INTO messages (user_id, role, content, has_image, created_at) VALUES (?,?,?,?,datetime('now','+9 hours'))").bind(user.id, "user", text || "(이미지)", image ? 1 : 0),
+    env.DB.prepare("INSERT INTO messages (user_id, role, content, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(user.id, "model", r.text),
+    env.DB.prepare("INSERT INTO usage_log (user_id, in_tokens, out_tokens, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(user.id, r.usage.in, r.usage.out),
   ]);
   return { reply: r.text, tools: r.calls, document: ctx.document || null };
 }
@@ -275,7 +275,7 @@ export default {
             handle = Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => A[b % A.length]).join("");
             if (!(await db.prepare("SELECT 1 FROM users WHERE handle=?").bind(handle).first())) break;
           }
-          await db.prepare("INSERT INTO users (handle, name, account_type) VALUES (?,?,?)")
+          await db.prepare("INSERT INTO users (handle, name, account_type, created_at) VALUES (?,?,?,datetime('now','+9 hours'))")
             .bind(handle, name, body.account_type === "general" ? "general" : "pension").run();
           return json({ handle, name }, 200, origin);
         }
@@ -308,7 +308,7 @@ export default {
              FROM usage_log GROUP BY d ORDER BY d DESC LIMIT 14`).all()).results;
           const month = await db.prepare(
             `SELECT COUNT(*) AS calls, COALESCE(SUM(in_tokens),0) AS in_tok, COALESCE(SUM(out_tokens),0) AS out_tok
-             FROM usage_log WHERE created_at >= date('now','localtime','start of month')`).first();
+             FROM usage_log WHERE created_at >= date('now','+9 hours','start of month')`).first();
           return json({ by_user: byUser, by_day: byDay, month, price: { in_per_mtok_usd: 0.75, out_per_mtok_usd: 3.75, model: env.GEMINI_MODEL } }, 200, origin);
         }
         return json({ error: "not found" }, 404, origin);
@@ -340,7 +340,7 @@ export default {
     const now = kstStr();
     const users = (await env.DB.prepare("SELECT * FROM users WHERE push_enabled=1").all()).results;
     for (const u of users) {
-      const sentToday = (await env.DB.prepare("SELECT COUNT(*) c FROM push_log WHERE user_id=? AND sent_at >= date('now','localtime')").bind(u.id).first()).c;
+      const sentToday = (await env.DB.prepare("SELECT COUNT(*) c FROM push_log WHERE user_id=? AND sent_at >= date('now','+9 hours')").bind(u.id).first()).c;
       if (sentToday >= DAILY_PUSH_CAP) continue;
       const subs = (await env.DB.prepare("SELECT * FROM push_subs WHERE user_id=?").bind(u.id).all()).results;
       if (!subs.length) continue;
@@ -353,7 +353,7 @@ export default {
         const payload = { title: `${ev.title} ${minsLeft <= 0 ? "지금" : Math.round(minsLeft) + "분 후"}`, body: occ.slice(5).replace("-", "/") + (ev.repeat !== "none" ? " (반복 일정)" : ""), url: "/#events" };
         for (const s of subs) { const r = await sendPush(s, payload, env); if (r.gone) await env.DB.prepare("DELETE FROM push_subs WHERE id=?").bind(s.id).run(); }
         await env.DB.prepare("UPDATE events SET last_notified=? WHERE id=?").bind(occ, ev.id).run();
-        await env.DB.prepare("INSERT INTO push_log (user_id, title) VALUES (?,?)").bind(u.id, payload.title).run();
+        await env.DB.prepare("INSERT INTO push_log (user_id, title, sent_at) VALUES (?,?,datetime('now','+9 hours'))").bind(u.id, payload.title).run();
       }
     }
   },
