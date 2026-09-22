@@ -15,7 +15,13 @@ function byName(name) {
 }
 
 /** @returns {{verdict:'가능'|'불가'|'확인 필요', group:'100'|'70'|'0'|null, basis:string, footer:string}} */
-export function checkPension({ code, name, kind }) {
+export function checkPension({ code, name, kind, accountType = "pension" }) {
+  // 일반 위탁계좌: 퇴직연금 규제가 적용되지 않는다
+  if (accountType === "general") {
+    if (/레버리지|인버스|2X|3X|곱버스/i.test((name || "").replace(/\s/g, "")))
+      return { verdict: "가능", group: null, basis: "일반 위탁계좌라 레버리지·인버스도 매수 가능. 다만 증권사에 따라 금융투자교육 이수와 기본예탁금이 필요합니다", footer: "손실이 지수 배수로 커지는 상품이라 장기 보유에는 적합하지 않습니다." };
+    return { verdict: "가능", group: null, basis: "일반 위탁계좌라 개별주식·ETF 모두 매수 가능하고 위험자산 한도도 없습니다", footer: "" };
+  }
   // kind: 네이버 stockEndType (stock | etf | etn | reits ...)
   if (kind === "stock" && /리츠|인프라|REIT/i.test(name || ""))
     return { verdict: "가능", group: "70", basis: "국내상장 리츠·인프라펀드는 개별주식 금지의 예외로 가능하되 위험자산이라 70% 한도에 포함(시행규칙 §10②)", footer: FOOTER };
@@ -52,7 +58,14 @@ export function riskRatio(holdings, totalBalance, add) {
   return { risk, ratio: Math.round((risk / totalBalance) * 1000) / 10 };
 }
 
-export function pensionRuleText() {
+export function pensionRuleText(accountType = "pension") {
+  if (accountType === "general") {
+    return [
+      "이 사용자의 계좌는 일반 위탁계좌다. 퇴직연금 규제(개별주식 금지, 레버리지·인버스 금지, 위험자산 70% 한도)가 적용되지 않는다.",
+      "개별주식·ETF·리츠 모두 매수 가능하고 한도도 없다. 레버리지·인버스는 증권사별로 교육 이수와 기본예탁금 조건이 붙을 수 있다고만 안내한다.",
+      "퇴직연금 관련 판정이나 70% 한도 이야기를 먼저 꺼내지 않는다.",
+    ].join("\n");
+  }
   return [
     "퇴직연금(DC·IRP) 계좌 투자 규칙 요약(2026-09 기준, 법령 원문):",
     "1) 개별주식·DR·해외상장 ETF·비상장 → 불가. 국내상장 리츠·인프라펀드는 가능(위험자산).",

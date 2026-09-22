@@ -236,3 +236,39 @@ img { max-width: 100%; display: block; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ----- 관리 ----- */
+.invite-result { margin-top: 14px; padding: 16px; background: var(--brand-soft); border-radius: var(--radius-sm); }
+.invite-code { font-family: ui-monospace, Consolas, monospace; font-size: 2rem; font-weight: 700; letter-spacing: 0.15em; color: var(--brand); }
+.admin-item { align-items: flex-start; }
+.admin-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
+.admin-actions select { min-height: 44px; padding: 6px 12px; border-radius: var(--radius-sm); border: 1.5px solid var(--line); background: var(--bg); }
+.btn.danger { color: var(--no); }
+.btn.danger:hover { background: var(--no-soft); }
+
+/* ----- 문서 ----- */
+.doc-open { margin-top: 10px; align-self: flex-start; }
+.doc-dialog { width: min(96vw, 860px); max-height: 92dvh; padding: 0; border: 0; border-radius: var(--radius); background: var(--bg); color: var(--ink); overflow: hidden; }
+.doc-dialog::backdrop { background: oklch(0 0 0 / 0.5); }
+.doc-bar { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.doc-body { padding: 28px 32px 40px; overflow-y: auto; max-height: calc(92dvh - 64px); }
+.doc-head { border-bottom: 2px solid var(--brand); padding-bottom: 14px; margin-bottom: 24px; }
+.doc-head h1 { font-size: 1.73rem; }
+.doc-head p { color: var(--ink-2); margin-top: 6px; }
+.doc-sec { margin-bottom: 26px; }
+.doc-sec h2 { font-size: 1.2rem; margin-bottom: 10px; }
+.doc-sec ul { margin: 0 0 12px; padding-left: 1.2em; }
+.doc-sec li { margin-bottom: 6px; }
+.doc-sec table { border-collapse: collapse; width: 100%; font-size: 0.94rem; margin: 10px 0; }
+.doc-sec th, .doc-sec td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; }
+.doc-sec th { background: var(--panel-2); font-weight: 700; }
+.doc-note { color: var(--ink-2); font-size: 0.83rem; margin-top: 6px; }
+
+@media print {
+  body > *:not(#doc-dialog) { display: none !important; }
+  .no-print { display: none !important; }
+  .doc-dialog { position: static; width: auto; max-height: none; display: block; }
+  .doc-body { max-height: none; overflow: visible; padding: 0; }
+  .doc-sec { break-inside: avoid; }
+  :root { --bg: #fff; --ink: #111; --ink-2: #555; --line: #ccc; --panel-2: #f2f2f2; --brand: #a8562a; }
+}

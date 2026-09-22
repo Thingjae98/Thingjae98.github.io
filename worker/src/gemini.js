@@ -13,6 +13,38 @@ export const TOOL_DECLS = [
   { name: "list_events", description: "다가오는 일정을 가져온다.", parameters: { type: "OBJECT", properties: { days: { type: "INTEGER", description: "며칠치, 기본 7" } } } },
   { name: "delete_event", description: "일정을 삭제한다.", parameters: { type: "OBJECT", properties: { id: { type: "INTEGER" } }, required: ["id"] } },
   { name: "save_memory", description: "사용자가 말한 투자 원칙·선호·관심사처럼 다음 대화에도 기억해야 할 사실을 한 줄로 저장한다.", parameters: { type: "OBJECT", properties: { content: { type: "STRING" } }, required: ["content"] } },
+  { name: "get_financials", description: "기업의 재무제표(매출액·영업이익·순이익·ROE·부채비율·EPS·PER·PBR·주당배당금)와 시가총액·52주 최고저 같은 투자지표를 가져온다. 기업 분석이나 보고서를 쓸 때 반드시 먼저 부른다. ETF는 재무제표가 없다.", parameters: { type: "OBJECT", properties: { query: { type: "STRING", description: "종목명 또는 6자리 코드" }, period: { type: "STRING", enum: ["annual", "quarter"], description: "연간(기본) 또는 분기" } }, required: ["query"] } },
+  {
+    name: "make_document",
+    description: "사용자가 보고서·문서·PDF·발표자료(PPT)를 만들어 달라고 할 때 부른다. 내용을 슬라이드/섹션 양식에 맞춰 채우면 화면이 실제 파일로 만들어 내려준다. 표와 글머리표를 적극 쓰고, 제목은 30자, 글머리표는 한 줄 60자 안쪽으로 짧게 쓴다.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        format: { type: "STRING", enum: ["pdf", "pptx"], description: "pdf=읽는 문서, pptx=발표자료" },
+        title: { type: "STRING", description: "문서 제목, 30자 이내" },
+        subtitle: { type: "STRING", description: "부제 또는 작성일·출처 한 줄" },
+        sections: {
+          type: "ARRAY",
+          description: "문서의 각 장(PPT에서는 슬라이드 한 장). 4~8개가 적당하다.",
+          items: {
+            type: "OBJECT",
+            properties: {
+              heading: { type: "STRING", description: "장 제목, 30자 이내" },
+              bullets: { type: "ARRAY", description: "핵심 문장 3~5개, 각 60자 이내", items: { type: "STRING" } },
+              table: {
+                type: "OBJECT",
+                description: "숫자를 보여줄 때만 넣는다. 열 4개·행 6개 이내.",
+                properties: { headers: { type: "ARRAY", items: { type: "STRING" } }, rows: { type: "ARRAY", items: { type: "ARRAY", items: { type: "STRING" } } } },
+              },
+              note: { type: "STRING", description: "출처나 주의사항 한 줄" },
+            },
+            required: ["heading"],
+          },
+        },
+      },
+      required: ["format", "title", "sections"],
+    },
+  },
 ];
 
 /**

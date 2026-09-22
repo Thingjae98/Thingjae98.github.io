@@ -149,6 +149,35 @@
         </div>
       </section>
 
+      <!-- 관리 (관리자 전용) -->
+      <section id="view-admin" class="view" data-view="admin" hidden>
+        <div class="panel">
+          <div class="panel-head"><h2>가족 추가</h2></div>
+          <form id="invite-form" class="inline-form">
+            <label class="field grow"><span>이름</span><input id="inv-name" type="text" placeholder="예: 아버지" required></label>
+            <label class="field"><span>계좌 종류</span>
+              <select id="inv-type"><option value="pension">퇴직연금 전용</option><option value="general">일반 계좌</option></select>
+            </label>
+            <button class="btn primary" type="submit">초대코드 만들기</button>
+          </form>
+          <div id="invite-result" class="invite-result" hidden>
+            <div class="invite-code" id="invite-code"></div>
+            <p class="hint">이 코드와 주소를 알려주세요. 받는 분이 직접 비밀번호 4자리를 정합니다.</p>
+            <button id="invite-copy" class="btn secondary small" type="button">코드와 주소 복사</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>가족 목록</h2><span class="muted small" id="admin-count"></span></div>
+          <div id="admin-users" class="list"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>이번 달 사용량</h2><span class="muted small" id="usage-cost"></span></div>
+          <div id="usage-body"></div>
+        </div>
+      </section>
+
       <!-- 설정 -->
       <section id="view-settings" class="view" data-view="settings" hidden>
         <div class="panel">
@@ -211,7 +240,20 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
+  <!-- 문서 미리보기 -->
+  <dialog id="doc-dialog" class="doc-dialog" aria-label="문서 미리보기">
+    <div class="doc-bar no-print">
+      <button id="doc-close" class="btn ghost small" type="button">닫기</button>
+      <div class="btn-row">
+        <button id="doc-pdf" class="btn secondary small" type="button">PDF로 저장</button>
+        <button id="doc-pptx" class="btn primary small" type="button">PPT 내려받기</button>
+      </div>
+    </div>
+    <article id="doc-body" class="doc-body"></article>
+  </dialog>
+
   <script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

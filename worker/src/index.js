@@ -2,6 +2,7 @@ import { chat as geminiChat } from "./gemini.js";
 import { checkPension, riskRatio, pensionRuleText } from "./pension.js";
 import { searchSymbol, getQuote } from "./quotes.js";
 import { sendPush } from "./push.js";
+import { getFinance, getKeyMetrics } from "./finance.js";
 
 const QUIET_FROM = 22, QUIET_TO = 7, DAILY_PUSH_CAP = 10, SESSION_DAYS = 30;
 
@@ -31,10 +32,10 @@ async function resolveSymbol(query) {
   return hits[0];
 }
 
-async function quoteWithPension(query, env) {
+async function quoteWithPension(query, env, accountType = "pension") {
   const s = await resolveSymbol(query);
   const q = await getQuote(s.code, env);
-  return { ...q, pension: checkPension({ code: q.code, name: q.name, kind: q.kind }) };
+  return { ...q, pension: checkPension({ code: q.code, name: q.name, kind: q.kind, accountType }) };
 }
 
 async function holdingsWithPrices(user, env) {
@@ -49,13 +50,13 @@ async function holdingsWithPrices(user, env) {
   return { holdings: priced, total_balance: user.total_balance, risk_value: rr.risk, risk_ratio_pct: rr.ratio };
 }
 
-function makeToolRunner(user, env) {
+function makeToolRunner(user, env, ctx = {}) {
   const db = env.DB;
   return async (name, a) => {
     switch (name) {
-      case "get_quote": return quoteWithPension(a.query, env);
+      case "get_quote": return quoteWithPension(a.query, env, user.account_type);
       case "simulate_buy": {
-        const q = await quoteWithPension(a.query, env);
+        const q = await quoteWithPension(a.query, env, user.account_type);
         if (q.pension.verdict === "불가") return { pension: q.pension, note: "매수 불가 종목이라 비중 계산 생략" };
         const cur = await holdingsWithPrices(user, env);
         const after = riskRatio(cur.holdings, user.total_balance, { code: q.code, name: q.name, qty: a.qty, price: q.price });
@@ -95,6 +96,15 @@ function makeToolRunner(user, env) {
       case "list_events": return { now: kstStr(), events: await upcomingEvents(user.id, a.days || 7, env) };
       case "delete_event": await db.prepare("DELETE FROM events WHERE id=? AND user_id=?").bind(a.id, user.id).run(); return { deleted: a.id };
       case "save_memory": await db.prepare("INSERT INTO memories (user_id, content) VALUES (?,?)").bind(user.id, a.content).run(); return { saved: a.content };
+      case "get_financials": {
+        const s = await resolveSymbol(a.query);
+        const [fin, met] = await Promise.all([
+          getFinance(s.code, a.period === "quarter" ? "quarter" : "annual").catch((e) => ({ error: String(e.message || e) })),
+          getKeyMetrics(s.code).catch((e) => ({ error: String(e.message || e) })),
+        ]);
+        return { financials: fin, key_metrics: met };
+      }
+      case "make_document": ctx.document = a; return { ok: true, note: "화면에서 파일로 만들어 사용자에게 내려줍니다. 답변에는 무엇을 만들었는지 한 줄만 적으세요." };
       default: throw new Error("unknown tool " + name);
     }
   };
@@ -142,9 +152,11 @@ async function buildSystem(user, env) {
     "- 사용자가 투자 원칙·선호·관심사를 말하면 save_memory 로 저장한다.",
     "- 일정을 말하면 add_event 로 저장하고 알림 시각을 확인해 준다.",
     "- 증권사 앱 캡처 이미지를 받으면 종목·수량·평단·평가금액을 읽어 정리하고, 보유 목록에 반영할지 묻는다.",
+    "- 기업 분석·보고서를 요청받으면 get_financials 로 실제 재무 숫자를 먼저 가져온다. 숫자는 가져온 값만 쓰고 추정하지 않는다. 최신 소식은 구글 검색으로 보완한다.",
+    "- '보고서로 만들어줘', 'PDF로', '발표자료로', 'PPT로' 같은 요청에는 make_document 를 부른다. 내용을 먼저 조사한 뒤 마지막에 부른다. 답변에는 무엇을 만들었는지 한 줄만 쓴다.",
     "- 답은 짧게. 표가 필요하면 마크다운 표. 이모지는 쓰지 않는다.",
     "",
-    pensionRuleText(),
+    pensionRuleText(user.account_type),
     "",
     "사용자에 대해 기억하는 것:", mem || "(아직 없음)",
     "",
@@ -153,7 +165,7 @@ async function buildSystem(user, env) {
   ].join("\n");
 }
 
-const pub = (u) => ({ id: u.id, handle: u.handle, name: u.name, agent_name: u.agent_name, honorific: u.honorific, tone: u.tone, push_enabled: !!u.push_enabled, total_balance: u.total_balance });
+const pub = (u) => ({ id: u.id, handle: u.handle, name: u.name, agent_name: u.agent_name, honorific: u.honorific, tone: u.tone, push_enabled: !!u.push_enabled, total_balance: u.total_balance, is_admin: !!u.is_admin, account_type: u.account_type || 'pension' });
 
 async function newSession(u, env) {
   const token = hex(crypto.getRandomValues(new Uint8Array(32)));
@@ -172,13 +184,14 @@ async function handleChat(user, body, env) {
   if (image) userParts.push({ inlineData: { mimeType: image.mimeType, data: image.data } });
   userParts.push({ text: text || "이 이미지를 읽어 정리해 주세요." });
   const system = await buildSystem(user, env);
-  const r = await geminiChat({ system, history: hist, userParts, runTool: makeToolRunner(user, env), env });
+  const ctx = {};
+  const r = await geminiChat({ system, history: hist, userParts, runTool: makeToolRunner(user, env, ctx), env });
   await env.DB.batch([
     env.DB.prepare("INSERT INTO messages (user_id, role, content, has_image) VALUES (?,?,?,?)").bind(user.id, "user", text || "(이미지)", image ? 1 : 0),
     env.DB.prepare("INSERT INTO messages (user_id, role, content) VALUES (?,?,?)").bind(user.id, "model", r.text),
     env.DB.prepare("INSERT INTO usage_log (user_id, in_tokens, out_tokens) VALUES (?,?,?)").bind(user.id, r.usage.in, r.usage.out),
   ]);
-  return { reply: r.text, tools: r.calls };
+  return { reply: r.text, tools: r.calls, document: ctx.document || null };
 }
 
 // ---------- 라우터 ----------
@@ -240,6 +253,66 @@ export default {
       if (p.startsWith("/events/") && req.method === "DELETE") { await db.prepare("DELETE FROM events WHERE id=? AND user_id=?").bind(idOf("/events/"), user.id).run(); return json({ ok: true }, 200, origin); }
       if (p === "/memories" && req.method === "GET") return json({ memories: (await db.prepare("SELECT * FROM memories WHERE user_id=? ORDER BY id DESC").bind(user.id).all()).results }, 200, origin);
       if (p.startsWith("/memories/") && req.method === "DELETE") { await db.prepare("DELETE FROM memories WHERE id=? AND user_id=?").bind(idOf("/memories/"), user.id).run(); return json({ ok: true }, 200, origin); }
+
+      // ---------- 관리자 ----------
+      if (p.startsWith("/admin/")) {
+        if (!user.is_admin) return json({ error: "관리자만 쓸 수 있습니다" }, 403, origin);
+        if (p === "/admin/users" && req.method === "GET") {
+          const rows = (await db.prepare(
+            `SELECT u.id, u.handle, u.name, u.account_type, u.is_admin, u.push_enabled, u.total_balance, u.created_at,
+                    u.pin_hash IS NOT NULL AS registered,
+                    (SELECT COUNT(*) FROM messages m WHERE m.user_id=u.id) AS msg_count,
+                    (SELECT MAX(created_at) FROM messages m WHERE m.user_id=u.id) AS last_seen
+             FROM users u ORDER BY u.id`).all()).results;
+          return json({ users: rows.map((r) => ({ ...r, registered: !!r.registered, is_admin: !!r.is_admin, push_enabled: !!r.push_enabled })) }, 200, origin);
+        }
+        if (p === "/admin/users" && req.method === "POST") {
+          const name = (body.name || "").trim();
+          if (!name) return json({ error: "이름을 넣어주세요" }, 400, origin);
+          const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+          let handle = "";
+          for (let i = 0; i < 8; i++) {
+            handle = Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => A[b % A.length]).join("");
+            if (!(await db.prepare("SELECT 1 FROM users WHERE handle=?").bind(handle).first())) break;
+          }
+          await db.prepare("INSERT INTO users (handle, name, account_type) VALUES (?,?,?)")
+            .bind(handle, name, body.account_type === "general" ? "general" : "pension").run();
+          return json({ handle, name }, 200, origin);
+        }
+        const m = p.match(/^\/admin\/users\/(\d+)$/);
+        if (m) {
+          const uid = Number(m[1]);
+          if (req.method === "PATCH") {
+            if ("account_type" in body) await db.prepare("UPDATE users SET account_type=? WHERE id=?").bind(body.account_type === "general" ? "general" : "pension", uid).run();
+            if ("name" in body) await db.prepare("UPDATE users SET name=? WHERE id=?").bind(String(body.name).trim(), uid).run();
+            if (body.reset_pin) {
+              await db.prepare("UPDATE users SET pin_hash=NULL WHERE id=?").bind(uid).run();
+              await db.prepare("DELETE FROM sessions WHERE user_id=?").bind(uid).run();
+            }
+            return json({ ok: true }, 200, origin);
+          }
+          if (req.method === "DELETE") {
+            if (uid === user.id) return json({ error: "자기 계정은 지울 수 없습니다" }, 400, origin);
+            for (const t of ["sessions", "messages", "holdings", "trades", "memories", "events", "push_subs", "push_log", "usage_log"])
+              await db.prepare(`DELETE FROM ${t} WHERE user_id=?`).bind(uid).run();
+            await db.prepare("DELETE FROM users WHERE id=?").bind(uid).run();
+            return json({ ok: true }, 200, origin);
+          }
+        }
+        if (p === "/admin/usage" && req.method === "GET") {
+          const byUser = (await db.prepare(
+            `SELECT u.name, COUNT(l.id) AS calls, COALESCE(SUM(l.in_tokens),0) AS in_tok, COALESCE(SUM(l.out_tokens),0) AS out_tok
+             FROM users u LEFT JOIN usage_log l ON l.user_id=u.id GROUP BY u.id ORDER BY in_tok DESC`).all()).results;
+          const byDay = (await db.prepare(
+            `SELECT date(created_at) AS d, COUNT(*) AS calls, SUM(in_tokens) AS in_tok, SUM(out_tokens) AS out_tok
+             FROM usage_log GROUP BY d ORDER BY d DESC LIMIT 14`).all()).results;
+          const month = await db.prepare(
+            `SELECT COUNT(*) AS calls, COALESCE(SUM(in_tokens),0) AS in_tok, COALESCE(SUM(out_tokens),0) AS out_tok
+             FROM usage_log WHERE created_at >= date('now','localtime','start of month')`).first();
+          return json({ by_user: byUser, by_day: byDay, month, price: { in_per_mtok_usd: 0.75, out_per_mtok_usd: 3.75, model: env.GEMINI_MODEL } }, 200, origin);
+        }
+        return json({ error: "not found" }, 404, origin);
+      }
 
       if (p === "/push/subscribe" && req.method === "POST") {
         const { endpoint, keys } = body;

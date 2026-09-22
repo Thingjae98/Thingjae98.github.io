@@ -77,14 +77,17 @@
     { id: "chat", label: "대화", icon: '<path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>' },
     { id: "assets", label: "자산", icon: '<path d="M4 18l5-6 4 3 7-8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 21h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' },
     { id: "events", label: "일정", icon: '<rect x="3.5" y="5" width="17" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 10h17M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' },
+    { id: "admin", label: "관리", adminOnly: true, icon: '<path d="M12 3l7 3v5.5c0 4.2-2.9 7.6-7 8.5-4.1-.9-7-4.3-7-8.5V6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' },
     { id: "settings", label: "설정", icon: '<circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' },
   ];
+  function visibleViews() { return VIEWS.filter((v) => !v.adminOnly || me?.is_admin); }
   function buildNav() {
-    const html = VIEWS.map((v) => `<button class="tab" type="button" data-go="${v.id}"><svg viewBox="0 0 24 24" aria-hidden="true">${v.icon}</svg><span>${v.label}</span></button>`).join("");
+    const html = visibleViews().map((v) => `<button class="tab" type="button" data-go="${v.id}"><svg viewBox="0 0 24 24" aria-hidden="true">${v.icon}</svg><span>${v.label}</span></button>`).join("");
+    document.querySelector(".tabbar").style.gridTemplateColumns = `repeat(${visibleViews().length}, 1fr)`;
     $("#nav-side").innerHTML = html; $("#nav-bottom").innerHTML = html;
     document.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => go(b.dataset.go)));
   }
-  const loaders = { chat: loadChat, assets: loadAssets, events: loadEvents, settings: loadSettings };
+  const loaders = { chat: loadChat, assets: loadAssets, events: loadEvents, settings: loadSettings, admin: loadAdmin };
   function go(id, push = true) {
     document.querySelectorAll(".view").forEach((v) => { v.hidden = v.dataset.view !== id; });
     document.querySelectorAll("[data-go]").forEach((b) => { if (b.dataset.go === id) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
@@ -97,6 +100,7 @@
   async function enter() {
     me = await api("GET", "/me");
     $("#lock").hidden = true; $("#app").hidden = false;
+    buildNav();
     applyMe();
     const h = location.hash.slice(1);
     go(VIEWS.some((v) => v.id === h) ? h : "chat", false);
@@ -122,6 +126,13 @@
     const thumb = opts.thumb ? `<img class="thumb" src="${opts.thumb}" alt="첨부한 캡처">` : "";
     const body = opts.pending ? `<span class="dots">${esc(content)}</span>` : role === "user" ? `<p>${esc(content).replace(/\n/g, "<br>")}</p>` : renderMd(content);
     el.innerHTML = `${thumb}<div class="bubble">${body}</div>${opts.time ? `<div class="time">${opts.time}</div>` : ""}`;
+    if (opts.document) {
+      const btn = document.createElement("button");
+      btn.type = "button"; btn.className = "btn secondary doc-open";
+      btn.textContent = (opts.document.format === "pptx" ? "발표자료 보기" : "문서 보기") + " · " + opts.document.title;
+      btn.addEventListener("click", () => openDoc(opts.document));
+      el.appendChild(btn);
+    }
     log.appendChild(el);
     log.scrollTop = log.scrollHeight;
     return el;
@@ -159,7 +170,7 @@
     try {
       const r = await api("POST", "/chat", { text, image: img ? { mimeType: img.mimeType, data: img.data } : undefined });
       pending.remove();
-      addMsg("model", r.reply, { time: new Date().toTimeString().slice(0, 5) });
+      addMsg("model", r.reply, { time: new Date().toTimeString().slice(0, 5), document: r.document });
     } catch (ex) {
       pending.remove();
       addMsg("model", `죄송합니다, 답을 가져오지 못했습니다. (${ex.message}) 잠시 후 다시 말씀해 주세요.`);
@@ -298,6 +309,117 @@
   $("#install-btn").addEventListener("click", async () => { if (!deferredInstall) return; deferredInstall.prompt(); await deferredInstall.userChoice; deferredInstall = null; $("#install-btn").hidden = true; });
   function urlB64ToU8(s) { const b = atob((s + "=".repeat((4 - (s.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(b, (c) => c.charCodeAt(0)); }
   function registerSW() { if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {}); }
+
+  // ---------- 관리 ----------
+  const ACCOUNT_LABEL = { pension: "퇴직연금 전용", general: "일반 계좌" };
+  async function loadAdmin() {
+    const { users } = await api("GET", "/admin/users");
+    $("#admin-count").textContent = `${users.length}명`;
+    $("#admin-users").innerHTML = users.map((u) => `
+      <div class="item admin-item">
+        <div class="item-main">
+          <div class="item-title">${esc(u.name)} <span class="mono muted">${u.handle}</span>${u.is_admin ? ' <span class="badge ok">관리자</span>' : ""}</div>
+          <div class="item-sub">${u.registered ? `가입함 · 대화 ${u.msg_count}회${u.last_seen ? " · 최근 " + u.last_seen.slice(5, 16) : ""}` : "아직 가입 전"}</div>
+          <div class="admin-actions">
+            <select data-acct="${u.id}" aria-label="${esc(u.name)} 계좌 종류">
+              <option value="pension"${u.account_type === "pension" ? " selected" : ""}>퇴직연금 전용</option>
+              <option value="general"${u.account_type === "general" ? " selected" : ""}>일반 계좌</option>
+            </select>
+            <button class="btn ghost small" type="button" data-reset="${u.id}" data-name="${esc(u.name)}">비밀번호 초기화</button>
+            ${u.is_admin ? "" : `<button class="btn ghost small danger" type="button" data-deluser="${u.id}" data-name="${esc(u.name)}">삭제</button>`}
+          </div>
+        </div>
+      </div>`).join("");
+
+    const d = await api("GET", "/admin/usage");
+    const won = (t) => Math.round(((t.in_tok / 1e6) * d.price.in_per_mtok_usd + (t.out_tok / 1e6) * d.price.out_per_mtok_usd) * 1400);
+    $("#usage-cost").textContent = `약 ${fmt(won(d.month))}원 · 대화 ${fmt(d.month.calls)}회`;
+    const rows = d.by_user.filter((u) => u.calls > 0);
+    $("#usage-body").innerHTML = rows.length
+      ? `<div class="list">${rows.map((u) => `<div class="item"><div class="item-main"><div class="item-title">${esc(u.name)}</div><div class="item-sub">대화 ${fmt(u.calls)}회</div></div><div class="item-num">약 ${fmt(won(u))}원</div></div>`).join("")}</div>
+         <p class="hint">누적 기준입니다. 요금은 ${d.price.model} 기준으로 환산했고 실제 청구액은 구글 콘솔에서 확인하세요.</p>`
+      : `<p class="empty-row">아직 사용 기록이 없습니다.</p>`;
+  }
+  $("#invite-form").addEventListener("submit", async (e) => {
+    e.preventDefault(); const btn = e.submitter || e.target.querySelector("button[type=submit]"); busy(btn, true);
+    try {
+      const r = await api("POST", "/admin/users", { name: $("#inv-name").value.trim(), account_type: $("#inv-type").value });
+      $("#invite-code").textContent = r.handle;
+      $("#invite-result").hidden = false;
+      $("#inv-name").value = "";
+      loadAdmin();
+    } catch (ex) { toast(ex.message); } finally { busy(btn, false); }
+  });
+  $("#invite-copy").addEventListener("click", async () => {
+    const text = `${location.origin}${location.pathname}\n초대 코드: ${$("#invite-code").textContent}\n\n주소를 열고 코드를 넣은 뒤 원하는 비밀번호 4자리를 정하세요.`;
+    try { await navigator.clipboard.writeText(text); toast("복사했습니다."); } catch { toast("복사가 안 됩니다. 코드를 직접 적어주세요."); }
+  });
+  document.addEventListener("change", async (e) => {
+    const sel = e.target.closest("[data-acct]"); if (!sel) return;
+    try { await api("PATCH", "/admin/users/" + sel.dataset.acct, { account_type: sel.value }); toast(`${ACCOUNT_LABEL[sel.value]}으로 바꿨습니다.`); } catch (ex) { toast(ex.message); }
+  });
+  document.addEventListener("click", async (e) => {
+    const reset = e.target.closest("[data-reset]"), del = e.target.closest("[data-deluser]");
+    try {
+      if (reset && confirm(`${reset.dataset.name}님의 비밀번호를 지울까요? 다음에 들어올 때 새로 정하게 됩니다.`)) {
+        await api("PATCH", "/admin/users/" + reset.dataset.reset, { reset_pin: true }); toast("초기화했습니다."); loadAdmin();
+      }
+      if (del && confirm(`${del.dataset.name}님의 계정과 모든 기록을 지울까요? 되돌릴 수 없습니다.`)) {
+        await api("DELETE", "/admin/users/" + del.dataset.deluser); toast("삭제했습니다."); loadAdmin();
+      }
+    } catch (ex) { toast(ex.message); }
+  });
+
+  // ---------- 문서 ----------
+  let currentDoc = null;
+  function openDoc(doc) {
+    currentDoc = doc;
+    const secHtml = (doc.sections || []).map((s) => `
+      <section class="doc-sec">
+        <h2>${esc(s.heading || "")}</h2>
+        ${(s.bullets || []).length ? `<ul>${s.bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
+        ${s.table?.headers?.length ? `<table><thead><tr>${s.table.headers.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${(s.table.rows || []).map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>` : ""}
+        ${s.note ? `<p class="doc-note">${esc(s.note)}</p>` : ""}
+      </section>`).join("");
+    $("#doc-body").innerHTML = `<header class="doc-head"><h1>${esc(doc.title || "")}</h1>${doc.subtitle ? `<p>${esc(doc.subtitle)}</p>` : ""}</header>${secHtml}`;
+    $("#doc-pptx").hidden = doc.format !== "pptx";
+    $("#doc-dialog").showModal();
+  }
+  $("#doc-close").addEventListener("click", () => $("#doc-dialog").close());
+  $("#doc-pdf").addEventListener("click", () => window.print());
+  $("#doc-pptx").addEventListener("click", () => { try { makePptx(currentDoc); } catch (ex) { toast("발표자료를 만들지 못했습니다. " + ex.message); } });
+
+  function makePptx(doc) {
+    const P = new PptxGenJS();
+    P.layout = "LAYOUT_16x9";
+    const FONT = "맑은 고딕", INK = "1F2328", MUTED = "6B7280", BRAND = "A8562A";
+    let s = P.addSlide();
+    s.background = { color: "FFFFFF" };
+    s.addShape(P.ShapeType.rect, { x: 0, y: 2.35, w: 1.2, h: 0.09, fill: { color: BRAND } });
+    s.addText(doc.title || "", { x: 0.9, y: 2.6, w: 8.2, h: 1.1, fontSize: 38, bold: true, color: INK, fontFace: FONT });
+    if (doc.subtitle) s.addText(doc.subtitle, { x: 0.9, y: 3.7, w: 8.2, h: 0.5, fontSize: 16, color: MUTED, fontFace: FONT });
+    s.addShape(P.ShapeType.rect, { x: 0.9, y: 2.45, w: 0.9, h: 0.06, fill: { color: BRAND } });
+    for (const sec of doc.sections || []) {
+      const sl = P.addSlide();
+      sl.background = { color: "FFFFFF" };
+      sl.addText(sec.heading || "", { x: 0.6, y: 0.45, w: 8.8, h: 0.7, fontSize: 26, bold: true, color: INK, fontFace: FONT });
+      sl.addShape(P.ShapeType.rect, { x: 0.6, y: 1.15, w: 0.7, h: 0.05, fill: { color: BRAND } });
+      let y = 1.5;
+      if ((sec.bullets || []).length) {
+        sl.addText(sec.bullets.map((b) => ({ text: b, options: { bullet: { code: "2022" }, breakLine: true } })),
+          { x: 0.7, y, w: 8.6, h: Math.min(3.0, 0.45 * sec.bullets.length + 0.2), fontSize: 16, color: INK, fontFace: FONT, lineSpacingMultiple: 1.25, valign: "top" });
+        y += Math.min(3.0, 0.45 * sec.bullets.length + 0.3);
+      }
+      if (sec.table?.headers?.length) {
+        const head = sec.table.headers.map((h) => ({ text: String(h), options: { bold: true, color: "FFFFFF", fill: { color: BRAND } } }));
+        const body = (sec.table.rows || []).map((r) => r.map((c) => ({ text: String(c) })));
+        sl.addTable([head, ...body], { x: 0.7, y: Math.min(y, 3.6), w: 8.6, fontSize: 13, color: INK, fontFace: FONT, border: { pt: 0.5, color: "D9DCE1" }, align: "left", valign: "middle", rowH: 0.34 });
+      }
+      if (sec.note) sl.addText(sec.note, { x: 0.7, y: 4.85, w: 8.6, h: 0.4, fontSize: 11, color: MUTED, fontFace: FONT, italic: true });
+    }
+    P.writeFile({ fileName: (doc.title || "발표자료").replace(/[\\/:*?"<>|]/g, "") + ".pptx" });
+    toast("발표자료를 내려받았습니다.");
+  }
 
   // ---------- 시작 ----------
   buildNav();
