@@ -228,6 +228,25 @@ async function handleChat(user, body, env) {
   const text = (body.text || "").trim();
   const image = body.image; // { mimeType, data(base64) }
   if (!text && !image) throw new Error("내용이 없습니다");
+  const mode = ["fast", "smart", "deep"].includes(body.mode) ? body.mode : "smart";
+
+  // 깊게: LLM 을 거치지 않고 바로 로컬 PC 작업 대기줄로 넘긴다
+  if (mode === "deep" && text) {
+    const holdings = (await env.DB.prepare("SELECT name, code, qty FROM holdings WHERE user_id=?").bind(user.id).all()).results;
+    const memos = (await env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY id DESC LIMIT 20").bind(user.id).all()).results;
+    const ctxLines = [
+      holdings.length ? "보유 종목: " + holdings.map((h) => `${h.name}${h.qty ? ` ${h.qty}주` : ""}`).join(", ") : "",
+      user.total_balance ? `계좌 총액: ${user.total_balance.toLocaleString()}원` : "",
+      memos.length ? "기억하는 것: " + memos.map((m) => m.content).join(" / ") : "",
+    ].filter(Boolean).join("\n");
+    const r = await env.DB.prepare("INSERT INTO jobs (user_id, prompt, context) VALUES (?,?,?)").bind(user.id, text, ctxLines || null).run();
+    const reply = "깊이 알아보고 있습니다. 준비되면 알려드리겠습니다.";
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO messages (user_id, role, content, has_image, created_at) VALUES (?,?,?,?,datetime('now','+9 hours'))").bind(user.id, "user", text, 0),
+      env.DB.prepare("INSERT INTO messages (user_id, role, content, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(user.id, "model", reply),
+    ]);
+    return { reply, tools: [], document: null, job_id: r.meta.last_row_id };
+  }
   const hist = (await env.DB.prepare("SELECT role, content FROM messages WHERE user_id=? ORDER BY id DESC LIMIT 24").bind(user.id).all()).results.reverse()
     .map((m) => ({ role: m.role, parts: [{ text: m.content }] }));
   const userParts = [];
@@ -235,7 +254,7 @@ async function handleChat(user, body, env) {
   userParts.push({ text: text || "이 이미지를 읽어 정리해 주세요." });
   const system = await buildSystem(user, env);
   const ctx = {};
-  const r = await geminiChat({ system, history: hist, userParts, runTool: makeToolRunner(user, env, ctx), env });
+  const r = await geminiChat({ system, history: hist, userParts, runTool: makeToolRunner(user, env, ctx), env, model: mode === "fast" ? (env.GEMINI_MODEL_FAST || "gemini-3.5-flash-lite") : undefined });
   await env.DB.batch([
     env.DB.prepare("INSERT INTO messages (user_id, role, content, has_image, created_at) VALUES (?,?,?,?,datetime('now','+9 hours'))").bind(user.id, "user", text || "(이미지)", image ? 1 : 0),
     env.DB.prepare("INSERT INTO messages (user_id, role, content, document, created_at) VALUES (?,?,?,?,datetime('now','+9 hours'))").bind(user.id, "model", r.text, ctx.document ? JSON.stringify(ctx.document) : null),

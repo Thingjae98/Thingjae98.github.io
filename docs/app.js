@@ -173,6 +173,21 @@
     chatLoaded = true;
     resumePendingJobs();
   }
+  const MODE_HINT = {
+    fast: "값싼 모델로 빠르게 답합니다. 시세·일정처럼 간단한 것에 좋습니다.",
+    smart: "기본 모델입니다. 종목 분석과 뉴스까지 대부분 여기서 처리합니다.",
+    deep: "이 PC에서 시간을 들여 깊이 조사합니다. 몇 분 걸리고 답은 나중에 도착합니다.",
+  };
+  let chatMode = store.get("fa_mode") || "smart";
+  function applyMode() {
+    document.querySelectorAll(".mode").forEach((b) => b.setAttribute("aria-checked", b.dataset.mode === chatMode ? "true" : "false"));
+    $("#mode-hint").textContent = MODE_HINT[chatMode];
+  }
+  document.querySelectorAll(".mode").forEach((b) => b.addEventListener("click", () => {
+    chatMode = b.dataset.mode; store.set("fa_mode", chatMode); applyMode();
+  }));
+  applyMode();
+
   const input = $("#chat-input");
   input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 160) + "px"; });
   input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing && window.matchMedia("(min-width: 1024px)").matches) { e.preventDefault(); $("#chat-form").requestSubmit(); } });
@@ -191,10 +206,10 @@
     const img = attachment; attachment = null; $("#attach-preview").hidden = true;
     input.value = ""; input.style.height = "auto";
     addMsg("user", text || "(사진)", { thumb: img?.preview, time: new Date().toTimeString().slice(0, 5) });
-    const pending = addMsg("model", `${me.agent_name}가 생각 중`, { pending: true });
+    const pending = addMsg("model", chatMode === "deep" ? "깊이 알아보는 중" : `${me.agent_name}가 생각 중`, { pending: true });
     busy($("#chat-send"), true);
     try {
-      const r = await api("POST", "/chat", { text, image: img ? { mimeType: img.mimeType, data: img.data } : undefined });
+      const r = await api("POST", "/chat", { text, mode: chatMode, image: img ? { mimeType: img.mimeType, data: img.data } : undefined });
       pending.remove();
       addMsg("model", r.reply, { time: new Date().toTimeString().slice(0, 5), document: r.document });
       if (r.job_id) watchJob(r.job_id);

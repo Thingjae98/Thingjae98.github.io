@@ -54,8 +54,8 @@ export const TOOL_DECLS = [
  * @param {object} p  { system, history:[{role,parts}], userParts:[...], runTool:(name,args)=>Promise<object>, env }
  * @returns {Promise<{text:string, usage:{in:number,out:number}, calls:string[]}>}
  */
-export async function chat({ system, history, userParts, runTool, env }) {
-  const model = env.GEMINI_MODEL || "gemini-3.8-flash";
+export async function chat({ system, history, userParts, runTool, env, model: override }) {
+  const model = override || env.GEMINI_MODEL || "gemini-3.8-flash";
   const contents = [...history, { role: "user", parts: userParts }];
   const usage = { in: 0, out: 0 };
   const calls = [];
