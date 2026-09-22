@@ -238,12 +238,26 @@ async function handleChat(user, body, env) {
 
   // 깊게: LLM 을 거치지 않고 바로 로컬 PC 작업 대기줄로 넘긴다
   if (mode === "deep" && text) {
-    const holdings = (await env.DB.prepare("SELECT name, code, qty FROM holdings WHERE user_id=?").bind(user.id).all()).results;
+    const holdings = (await env.DB.prepare("SELECT name, code, qty, weight_pct FROM holdings WHERE user_id=?").bind(user.id).all()).results;
     const memos = (await env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY id DESC LIMIT 20").bind(user.id).all()).results;
+    // 클로드 쪽에서는 네이버 금융에 직접 붙지 못하므로, 서버가 가진 확정 수치를 미리 실어 보낸다
+    const detail = [];
+    for (const h of holdings.slice(0, 12)) {
+      if (!h.code) { detail.push(`- ${h.name}`); continue; }
+      try {
+        const q = await getQuote(h.code, env);
+        const pv = checkPension({ code: q.code, name: q.name, kind: q.kind, accountType: user.account_type });
+        detail.push(`- ${q.name}(${q.code}) 현재가 ${q.price?.toLocaleString()}원, 전일대비 ${q.changeRate}%`
+          + (h.qty ? `, ${h.qty}주` : "") + (h.weight_pct ? `, 비중 ${h.weight_pct}%` : "")
+          + (user.account_type === "general" ? "" : `, 퇴직연금 ${pv.verdict}${pv.group ? " " + pv.group + "%" : ""}`));
+      } catch { detail.push(`- ${h.name}${h.weight_pct ? ` 비중 ${h.weight_pct}%` : ""}`); }
+    }
     const ctxLines = [
-      holdings.length ? "보유 종목: " + holdings.map((h) => `${h.name}${h.qty ? ` ${h.qty}주` : ""}`).join(", ") : "",
+      detail.length ? "보유 종목 (서버에서 방금 조회한 확정 수치):\n" + detail.join("\n") : "",
       user.total_balance ? `계좌 총액: ${user.total_balance.toLocaleString()}원` : "",
       memos.length ? "기억하는 것: " + memos.map((m) => m.content).join(" / ") : "",
+      user.account_type === "general" ? "계좌: 일반 위탁계좌" : "계좌: 퇴직연금(DC/IRP). 개별주식·레버리지·인버스 매수 불가, 위험자산 70% 한도.",
+      "위 수치는 확정된 값이니 그대로 쓰면 된다. 시세를 웹에서 다시 찾지 말 것. 뉴스·업황은 검색해도 좋다.",
     ].filter(Boolean).join("\n");
     const r = await env.DB.prepare("INSERT INTO jobs (user_id, prompt, context) VALUES (?,?,?)").bind(user.id, text, ctxLines || null).run();
     const reply = "깊이 알아보고 있습니다. 준비되면 알려드리겠습니다.";
