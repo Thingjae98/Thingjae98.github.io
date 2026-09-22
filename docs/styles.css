@@ -272,3 +272,8 @@ img { max-width: 100%; display: block; }
   .doc-sec { break-inside: avoid; }
   :root { --bg: #fff; --ink: #111; --ink-2: #555; --line: #ccc; --panel-2: #f2f2f2; --brand: #a8562a; }
 }
+
+@media (max-width: 640px) {
+  #invite-form { flex-direction: column; align-items: stretch; }
+  #invite-form .field { width: 100%; }
+}
