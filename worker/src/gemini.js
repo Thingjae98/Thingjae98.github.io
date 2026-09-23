@@ -69,7 +69,7 @@ export async function chat({ system, history, userParts, runTool, env, model: ov
         contents,
         tools: [{ functionDeclarations: TOOL_DECLS }, { googleSearch: {} }],
         tool_config: { include_server_side_tool_invocations: true },
-        generationConfig: { temperature: 0.4, maxOutputTokens: 1500 },
+        generationConfig: { temperature: 0.4, maxOutputTokens: 8192 }, // 검색 호출·내부 추론도 이 한도를 먹어서 작으면 답이 중간에 끊긴다
       }),
     });
     const j = await r.json();
