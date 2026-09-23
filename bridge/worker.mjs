@@ -71,10 +71,14 @@ function stepLabel(tool) {
 function runClaude(prompt, onStep) {
   return new Promise((resolve, reject) => {
     // stdin 을 닫아야 claude 가 입력을 기다리지 않는다. 인자는 배열로 넘겨 이스케이프 문제를 피한다.
-    // 조사에 필요한 읽기 전용 도구와 스킬만 연다. 파일 쓰기·명령 실행은 주지 않는다.
+    // 보안: 웹페이지에 숨은 지시문이 명령 실행·파일 읽기를 시키지 못하게, 도구는 웹 검색·웹 읽기·스킬 3개만 "존재"하게 한다(--tools).
+    // --allowedTools 만으로는 다른 도구가 사라지지 않고, 대표님 전역 설정의 허용 목록(ssh·scp)까지 물려받는다.
+    // 그래서 전역 설정·MCP 를 끊고(--setting-sources project, --strict-mcp-config), .env 가 없는 sandbox 폴더에서 실행한다.
     // 모델은 대표님 클로드 코드 기본값과 무관하게 Opus 로 고정한다.
-    const args = ["-p", prompt, "--model", "opus", "--output-format", "stream-json", "--verbose", "--allowedTools", "WebSearch", "WebFetch", "Skill"];
-    const p = spawn("claude", args, { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+    const args = ["-p", prompt, "--model", "opus", "--output-format", "stream-json", "--verbose",
+      "--tools", "WebSearch,WebFetch,Skill", "--allowedTools", "WebSearch", "WebFetch", "Skill",
+      "--setting-sources", "project", "--strict-mcp-config"];
+    const p = spawn("claude", args, { windowsHide: true, stdio: ["ignore", "pipe", "pipe"], cwd: path.join(here, "sandbox") });
     let buf = "", err = "", result = null;
     const timer = setTimeout(() => { p.kill(); reject(new Error("10분을 넘겨 중단했습니다")); }, TIMEOUT_MS);
     p.stdout.on("data", (d) => {
