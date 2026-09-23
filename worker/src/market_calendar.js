@@ -23,6 +23,13 @@ export const MARKET_EVENTS = [
   { date: "2027-06-10", time: "03:00", title: "미국 FOMC 금리 결정", source: FED },
 ];
 
+/** AI 에게 넘길 확정 일정 문단 (앞으로 days 일). 없으면 빈 문자열 */
+export function marketLines(today, days = 14) {
+  const list = upcomingMarket(today, days);
+  return list.length ? "공식 확정 시장 일정(한국시간, 발표 기관 공식 일정표 기준 — 이 날짜·시각을 그대로 쓰고 다른 날짜로 바꾸지 말 것):\n"
+    + list.map((e) => `- ${e.date}${e.time ? " " + e.time : ""} ${e.title}`).join("\n") : "";
+}
+
 /** today(YYYY-MM-DD)부터 days 일 안의 시장 일정 */
 export function upcomingMarket(today, days) {
   const end = new Date(Date.parse(today + "T00:00:00Z") + days * 86400e3).toISOString().slice(0, 10);

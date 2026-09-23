@@ -1,6 +1,7 @@
 // 아침 브리핑: 보유 종목 이슈 점검 + 오늘 일정. 하루 1회, 켠 사람에게만.
 import { getQuote } from "./quotes.js";
 import { checkPension, etfShareLine } from "./pension.js";
+import { marketLines } from "./market_calendar.js";
 
 export const NO_HOLDINGS_NOTE = "보유 종목: 등록된 것 없음. 보유 종목 점검·안전자산·추천 칸은 빼고 시황과 앞으로 2주 일정만 쓴 뒤, 끝에 '자산 탭에서 보유 종목을 등록하시면 종목별 점검을 해드립니다.'를 한 줄 덧붙인다.";
 
@@ -53,6 +54,7 @@ export async function buildBrief(user, env, deps) {
     "",
     rows.length ? "보유 종목(어제 종가 기준 등락):\n" + holdingLines.join("\n") : NO_HOLDINGS_NOTE,
     etfShareLine(user),
+    marketLines(new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10)),
     eventLines.length ? "\n오늘 일정:\n" + eventLines.join("\n") : "",
   ].join("\n");
 

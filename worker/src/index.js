@@ -5,7 +5,7 @@ import { sendPush } from "./push.js";
 import { getFinance, getKeyMetrics } from "./finance.js";
 import { analyzeStyle, riskProfile } from "./profile.js";
 import { buildBrief, NO_HOLDINGS_NOTE } from "./brief.js";
-import { upcomingMarket } from "./market_calendar.js";
+import { upcomingMarket, marketLines } from "./market_calendar.js";
 
 const QUIET_FROM = 22, QUIET_TO = 7, DAILY_PUSH_CAP = 10, SESSION_DAYS = 30;
 
@@ -305,6 +305,7 @@ async function deepContext(user, env) {
   return [
     detail.length ? "보유 종목 (서버에서 방금 조회한 확정 수치):\n" + detail.join("\n") : "",
     etfShareLine(user),
+    marketLines(kstStr().slice(0, 10)),
     user.total_balance ? `계좌 총액: ${user.total_balance.toLocaleString()}원` : "",
     memos.length ? "기억하는 것: " + memos.map((m) => m.content).join(" / ") : "",
     user.account_type === "general" ? "계좌: 일반 위탁계좌" : "계좌: 퇴직연금(DC/IRP). 개별주식·레버리지·인버스 매수 불가, 위험자산 70% 한도.",
