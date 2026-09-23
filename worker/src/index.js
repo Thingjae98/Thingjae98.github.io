@@ -1,5 +1,5 @@
 import { chat as geminiChat } from "./gemini.js";
-import { checkPension, riskRatio, pensionRuleText, searchEtf } from "./pension.js";
+import { checkPension, riskRatio, pensionRuleText, searchEtf, etfShareLine } from "./pension.js";
 import { searchSymbol, getQuote } from "./quotes.js";
 import { sendPush } from "./push.js";
 import { getFinance, getKeyMetrics } from "./finance.js";
@@ -52,14 +52,17 @@ async function cachedPrice(code, env) {
 
 async function holdingsWithPrices(user, env) {
   const rows = (await env.DB.prepare("SELECT id, code, name, qty, avg_price, weight_pct FROM holdings WHERE user_id=? ORDER BY id").bind(user.id).all()).results;
+  // 등록 비중이 ETF 부분 기준이면 계좌 기준으로 줄인다 (etf_share_pct)
+  const knownWeight = rows.reduce((s, h) => s + (h.weight_pct || 0), 0);
+  const f = user.etf_share_pct != null && knownWeight ? user.etf_share_pct / knownWeight : 1;
   const priced = await Promise.all(rows.map(async (h) => {
     let price = h.avg_price;
     if (h.code) { try { price = await cachedPrice(h.code, env); } catch {} }
-    const value = h.qty && price ? price * h.qty : (h.weight_pct && user.total_balance ? Math.round((h.weight_pct / 100) * user.total_balance) : null);
+    const value = h.qty && price ? price * h.qty : (h.weight_pct && user.total_balance ? Math.round((h.weight_pct * f / 100) * user.total_balance) : null);
     return { ...h, price, value };
   }));
-  const rr = riskRatio(priced, user.total_balance);
-  return { holdings: priced, total_balance: user.total_balance, risk_value: rr.risk, risk_ratio_pct: rr.ratio };
+  const rr = riskRatio(priced, user.total_balance, null, user.etf_share_pct);
+  return { holdings: priced, total_balance: user.total_balance, risk_value: rr.risk, risk_ratio_pct: rr.ratio, etf_share_pct: user.etf_share_pct };
 }
 
 function makeToolRunner(user, env, ctx = {}) {
@@ -71,7 +74,7 @@ function makeToolRunner(user, env, ctx = {}) {
         const q = await quoteWithPension(a.query, env, user.account_type);
         if (q.pension.verdict === "불가") return { pension: q.pension, note: "매수 불가 종목이라 비중 계산 생략" };
         const cur = await holdingsWithPrices(user, env);
-        const after = riskRatio(cur.holdings, user.total_balance, { code: q.code, name: q.name, qty: a.qty, price: q.price });
+        const after = riskRatio(cur.holdings, user.total_balance, { code: q.code, name: q.name, qty: a.qty, price: q.price }, user.etf_share_pct);
         return { quote: q, before_pct: cur.risk_ratio_pct, after_pct: after.ratio, limit_pct: 70, total_balance: user.total_balance, note: user.total_balance ? null : "전체 적립금을 모르면 비중을 못 냅니다. 사용자에게 적립금을 물어보고 set_total_balance 로 저장하세요." };
       }
       case "list_holdings": return holdingsWithPrices(user, env);
@@ -204,7 +207,7 @@ async function buildSystem(user, env) {
     "",
     "사용자에 대해 기억하는 것:", mem || "(아직 없음)",
     "",
-    "보유 종목:", hold || "(등록된 것 없음)",
+    "보유 종목:", hold || "(등록된 것 없음)", etfShareLine(user),
     user.total_balance ? `퇴직연금 전체 적립금: ${user.total_balance.toLocaleString()}원` : "퇴직연금 전체 적립금: 미입력(비중 계산 전에 물어볼 것)",
   ].join("\n");
 }
@@ -279,6 +282,7 @@ async function deepContext(user, env) {
   }
   return [
     detail.length ? "보유 종목 (서버에서 방금 조회한 확정 수치):\n" + detail.join("\n") : "",
+    etfShareLine(user),
     user.total_balance ? `계좌 총액: ${user.total_balance.toLocaleString()}원` : "",
     memos.length ? "기억하는 것: " + memos.map((m) => m.content).join(" / ") : "",
     user.account_type === "general" ? "계좌: 일반 위탁계좌" : "계좌: 퇴직연금(DC/IRP). 개별주식·레버리지·인버스 매수 불가, 위험자산 70% 한도.",
@@ -410,7 +414,8 @@ export default {
 
       if (p === "/me" && req.method === "GET") return json(pub(user), 200, origin);
       if (p === "/me" && req.method === "PATCH") {
-        const allowed = ["agent_name", "honorific", "tone", "push_enabled", "total_balance", "name", "brief_enabled", "brief_hour"];
+        if ("etf_share_pct" in body && body.etf_share_pct != null) body.etf_share_pct = Math.min(100, Math.max(0, Number(body.etf_share_pct) || 0));
+        const allowed = ["agent_name", "honorific", "tone", "push_enabled", "total_balance", "name", "brief_enabled", "brief_hour", "etf_share_pct"];
         const sets = [], vals = [];
         for (const k of allowed) if (k in body) { sets.push(`${k}=?`); vals.push(k === "push_enabled" || k === "brief_enabled" ? (body[k] ? 1 : 0) : body[k]); }
         if (sets.length) await db.prepare(`UPDATE users SET ${sets.join(",")} WHERE id=?`).bind(...vals, user.id).run();

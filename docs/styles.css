@@ -221,6 +221,10 @@ img { max-width: 100%; display: block; }
 .meter-fill.near { background: var(--warn); } .meter-fill.over { background: var(--no); }
 .meter-limit { position: absolute; top: 0; bottom: 0; left: 70%; width: 2px; background: var(--ink); opacity: 0.5; }
 .meter-text { font-weight: 600; margin-bottom: 14px; }
+.share-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.share-head { display: flex; justify-content: space-between; gap: 8px; font-size: 0.89rem; font-weight: 600; color: var(--ink-2); }
+.share-head strong { color: var(--ink); font-size: 1rem; }
+#share-input { width: 100%; height: 32px; accent-color: var(--brand); }
 
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 4px 0 14px; }
 .switch-title { font-weight: 600; }

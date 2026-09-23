@@ -265,6 +265,10 @@
       }
       $("#risk-meter").setAttribute("aria-label", `위험자산 비중 ${d.risk_ratio_pct ?? 0}퍼센트, 한도 70퍼센트`);
     }
+    // 비중(%)으로 등록한 종목이 있을 때만: 등록 ETF가 계좌에서 차지하는 비율
+    $("#share-wrap").hidden = general || !d.holdings.some((h) => h.weight_pct != null);
+    $("#share-input").value = d.etf_share_pct ?? 100;
+    $("#share-val").textContent = `${d.etf_share_pct ?? 100}%`;
 
     const hl = $("#holdings-list");
     hl.innerHTML = d.holdings.length ? d.holdings.map((h) => {
@@ -282,6 +286,15 @@
       <button class="del" type="button" data-del-trade="${t.id}" aria-label="기록 삭제"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>`).join("")
       : `<div class="empty-row">매수·매도하신 것을 대화로 말씀하시면 여기 기록됩니다.</div>`;
   }
+
+  $("#share-input").addEventListener("input", (e) => { $("#share-val").textContent = `${e.target.value}%`; });
+  $("#share-input").addEventListener("change", async (e) => {
+    try {
+      await api("PATCH", "/me", { etf_share_pct: Number(e.target.value) });
+      toast(`ETF ${e.target.value}%, 안전자산 ${100 - Number(e.target.value)}%로 계산합니다.`);
+      loadAssets();
+    } catch (ex) { toast(ex.message); }
+  });
 
   $("#holdings-image").addEventListener("change", async (e) => {
     const f = e.target.files[0]; e.target.value = "";

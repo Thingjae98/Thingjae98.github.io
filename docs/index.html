@@ -102,6 +102,11 @@
             <div class="meter-limit" aria-hidden="true"></div>
           </div>
           <p class="meter-text" id="risk-text">전체 적립금을 입력하면 비중을 계산합니다.</p>
+          <label class="share-field" id="share-wrap" hidden>
+            <span class="share-head"><span>등록한 ETF가 계좌에서 차지하는 비율</span><strong id="share-val">100%</strong></span>
+            <input id="share-input" type="range" min="0" max="100" step="5" value="100" aria-describedby="share-hint">
+            <span class="muted small" id="share-hint">나머지는 예금·채권 등 안전자산으로 계산합니다.</span>
+          </label>
           <form id="balance-form" class="inline-form">
             <label class="field grow">
               <span id="balance-label">퇴직연금 전체 적립금 (원)</span>

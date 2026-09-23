@@ -47,8 +47,9 @@ export function checkPension({ code, name, kind, accountType = "pension" }) {
   return { verdict: "확인 필요", group: null, basis: "종목 종류를 확인하지 못함", footer: FOOTER };
 }
 
-/** 위험자산(70% 그룹) 비중 계산. holdings: [{code,name,qty,price}] price=현재가 */
-export function riskRatio(holdings, totalBalance, add) {
+/** 위험자산(70% 그룹) 비중 계산. holdings: [{code,name,qty,price}] price=현재가
+ *  etfShare: 비중으로 등록한 종목이 계좌에서 차지하는 비율(%). 있으면 등록 비중 합이 이 값이 되게 줄이고 나머지는 안전자산으로 본다 */
+export function riskRatio(holdings, totalBalance, add, etfShare = null) {
   const items = add ? [...holdings, add] : holdings;
   let risk = 0, riskWeight = 0, knownWeight = 0;
   for (const h of items) {
@@ -59,10 +60,17 @@ export function riskRatio(holdings, totalBalance, add) {
     if (isRisk) risk += (h.qty || 0) * (h.price || 0) || (h.weight_pct && totalBalance ? (h.weight_pct / 100) * totalBalance : 0);
   }
   // 비중만 아는 경우에는 비중 합으로 바로 낸다
-  if (knownWeight > 0) return { risk: Math.round(risk), ratio: Math.round(riskWeight * 10) / 10, by_weight: true, known_weight_pct: Math.round(knownWeight * 10) / 10 };
+  if (knownWeight > 0) {
+    const f = etfShare != null ? etfShare / knownWeight : 1;
+    return { risk: Math.round(risk * f), ratio: Math.round(riskWeight * f * 10) / 10, by_weight: true, known_weight_pct: Math.round(knownWeight * 10) / 10 };
+  }
   if (!totalBalance) return { risk, ratio: null };
   return { risk, ratio: Math.round((risk / totalBalance) * 1000) / 10 };
 }
+
+/** 등록 비중이 ETF 부분 기준일 때 AI 에게 알려줄 한 줄 */
+export const etfShareLine = (u) => u.etf_share_pct == null ? "" :
+  `등록한 종목 비중은 ETF 부분 안에서의 비중이다. 등록한 ETF는 계좌의 ${u.etf_share_pct}%이고, 나머지 ${100 - u.etf_share_pct}%는 예금·채권 등 안전자산이다. 위험자산 비중은 이것을 반영해 계산한다.`;
 
 export function pensionRuleText(accountType = "pension") {
   if (accountType === "general") {

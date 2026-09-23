@@ -1,6 +1,6 @@
 // 아침 브리핑: 보유 종목 이슈 점검 + 오늘 일정. 하루 1회, 켠 사람에게만.
 import { getQuote } from "./quotes.js";
-import { checkPension } from "./pension.js";
+import { checkPension, etfShareLine } from "./pension.js";
 
 /** 사용자 한 명의 브리핑을 만든다. LLM 한 번만 쓴다. */
 export async function buildBrief(user, env, deps) {
@@ -51,6 +51,7 @@ export async function buildBrief(user, env, deps) {
     "- 마크다운 소제목(##)과 글머리표를 쓰고 전체 1500자 안쪽.",
     "",
     rows.length ? "보유 종목(어제 종가 기준 등락):\n" + holdingLines.join("\n") : "보유 종목: 등록된 것 없음",
+    etfShareLine(user),
     eventLines.length ? "\n오늘 일정:\n" + eventLines.join("\n") : "",
   ].join("\n");
 
