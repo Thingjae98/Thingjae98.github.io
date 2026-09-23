@@ -99,7 +99,7 @@
     $("#top-title").textContent = VIEWS.find((v) => v.id === id).label;
     if (push) history.replaceState(null, "", "#" + id);
     loaders[id]().catch((e) => toast(e.message));
-    if (id !== "chat") window.scrollTo({ top: 0 });
+    if (id !== "chat") $("#main").scrollTop = 0; // 이제 페이지가 아니라 본문 칸이 스크롤된다
   }
 
   async function enter() {
@@ -155,9 +155,22 @@
     t.content.querySelectorAll("img").forEach((img) => img.replaceWith(document.createTextNode(img.alt || "")));
     return t.innerHTML;
   }
+  // 날짜가 바뀌는 곳마다 "9월 23일 (수)" 구분선을 넣는다
+  let lastDay = null;
+  const todayDay = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  function daySep(day) {
+    if (day === lastDay) return;
+    lastDay = day;
+    const [, mo, d] = day.split("-").map(Number);
+    const sep = document.createElement("div");
+    sep.className = "day-sep"; sep.setAttribute("role", "separator");
+    sep.innerHTML = `<span>${mo}월 ${d}일 (${"일월화수목금토"[new Date(day + "T00:00:00").getDay()]})</span>`;
+    $("#chat-log").appendChild(sep);
+  }
   function addMsg(role, content, opts = {}) {
     const log = $("#chat-log");
     log.querySelector(".empty")?.remove();
+    daySep(opts.day || todayDay());
     const el = document.createElement("div");
     el.className = `msg ${role === "user" ? "user" : "bot"}${opts.pending ? " pending" : ""}`;
     const thumb = opts.thumb ? `<img class="thumb" src="${opts.thumb}" alt="첨부한 캡처">` : "";
@@ -177,7 +190,7 @@
   async function loadChat() {
     if (chatLoaded) return;
     const { messages } = await api("GET", "/messages");
-    const log = $("#chat-log"); log.innerHTML = "";
+    const log = $("#chat-log"); log.innerHTML = ""; lastDay = null;
     if (!messages.length) {
       log.innerHTML = `<div class="empty"><strong>${esc(me.name)}${esc(me.honorific)}, 안녕하세요.</strong>종목 이름을 말씀하시면 현재가와 퇴직연금 계좌로 살 수 있는지 바로 알려드립니다. 아래 버튼을 눌러 시작해도 됩니다.</div>`;
     }
@@ -185,8 +198,10 @@
       if (m.content === "깊이 알아보고 있습니다. 준비되면 알려드리겠습니다.") continue; // 깊게 대기 안내는 진행 말풍선이 대신한다
       let doc = null;
       if (m.document) { try { doc = JSON.parse(m.document); } catch {} }
-      addMsg(m.role, m.content, { time: timeLabel(m.created_at), document: doc });
+      addMsg(m.role, m.content, { time: timeLabel(m.created_at), document: doc, day: m.created_at.slice(0, 10) });
     }
+    // 처음 열 때는 부드러운 스크롤 없이 곧장 최근 대화(맨 아래)로 간다
+    log.style.scrollBehavior = "auto"; log.scrollTop = log.scrollHeight; log.style.scrollBehavior = "";
     chatLoaded = true;
     resumePendingJobs();
   }
@@ -380,7 +395,6 @@
     $("#s-agent").value = me.agent_name; $("#s-name").value = me.name; $("#s-honorific").value = me.honorific;
     const preset = $("#s-tone-preset"); const found = [...preset.options].find((o) => o.value === me.tone);
     preset.value = found ? me.tone : "custom"; $("#s-tone").value = me.tone; $("#s-tone-custom-wrap").hidden = preset.value !== "custom";
-    $("#s-handle").textContent = me.handle; $("#s-api").textContent = API.replace(/^https?:\/\//, "");
     $("#push-toggle").setAttribute("aria-checked", me.push_enabled ? "true" : "false");
     $("#brief-toggle").setAttribute("aria-checked", me.brief_enabled ? "true" : "false");
     $("#brief-hour").value = String(me.brief_hour ?? 8);
