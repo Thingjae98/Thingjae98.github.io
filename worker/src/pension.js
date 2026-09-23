@@ -51,21 +51,21 @@ export function checkPension({ code, name, kind, accountType = "pension" }) {
  *  etfShare: 비중으로 등록한 종목이 계좌에서 차지하는 비율(%). 있으면 등록 비중 합이 이 값이 되게 줄이고 나머지는 안전자산으로 본다 */
 export function riskRatio(holdings, totalBalance, add, etfShare = null) {
   const items = add ? [...holdings, add] : holdings;
-  let risk = 0, riskWeight = 0, knownWeight = 0;
-  for (const h of items) {
-    const r = h.code && rules[h.code];
-    const group = r ? r.reti : (h.name && byName(h.name) ? "0" : "70");
-    const isRisk = group === "70" || group === "0";
-    if (h.weight_pct != null) { knownWeight += h.weight_pct; if (isRisk) riskWeight += h.weight_pct; }
-    if (isRisk) risk += (h.qty || 0) * (h.price || 0) || (h.weight_pct && totalBalance ? (h.weight_pct / 100) * totalBalance : 0);
-  }
-  // 비중만 아는 경우에는 비중 합으로 바로 낸다
-  if (knownWeight > 0) {
-    const f = etfShare != null ? etfShare / knownWeight : 1;
-    return { risk: Math.round(risk * f), ratio: Math.round(riskWeight * f * 10) / 10, by_weight: true, known_weight_pct: Math.round(knownWeight * 10) / 10 };
-  }
-  if (!totalBalance) return { risk, ratio: null };
-  return { risk, ratio: Math.round((risk / totalBalance) * 1000) / 10 };
+  const isRisk = (h) => { const r = h.code && rules[h.code]; const g = r ? r.reti : (h.name && byName(h.name) ? "0" : "70"); return g === "70" || g === "0"; };
+  // 금액을 아는 종목(수량×현재가)과 비중만 아는 종목을 나눈다
+  const byQty = items.filter((h) => h.qty && h.price);
+  const byWeight = items.filter((h) => !(h.qty && h.price) && h.weight_pct != null);
+  const knownWeight = byWeight.reduce((s, h) => s + h.weight_pct, 0);
+  const f = etfShare != null && knownWeight ? etfShare / knownWeight : 1; // 등록 비중 → 계좌 비중
+  const riskWeight = byWeight.filter(isRisk).reduce((s, h) => s + h.weight_pct, 0) * f;
+  const kw = { known_weight_pct: Math.round(knownWeight * 10) / 10 };
+  // 비중만 있는 경우: 비중 합으로 바로 낸다
+  if (!byQty.length && knownWeight > 0)
+    return { risk: totalBalance ? Math.round((riskWeight / 100) * totalBalance) : 0, ratio: Math.round(riskWeight * 10) / 10, by_weight: true, ...kw };
+  // 금액이 섞이면 전체 적립금이 있어야 계산할 수 있다
+  if (!totalBalance) return { risk: 0, ratio: null, ...(knownWeight ? kw : {}) };
+  const risk = byQty.filter(isRisk).reduce((s, h) => s + h.qty * h.price, 0) + (riskWeight / 100) * totalBalance;
+  return { risk: Math.round(risk), ratio: Math.round((risk / totalBalance) * 1000) / 10, ...(knownWeight ? { by_weight: true, ...kw } : {}) };
 }
 
 /** 등록 비중이 ETF 부분 기준일 때 AI 에게 알려줄 한 줄 */
