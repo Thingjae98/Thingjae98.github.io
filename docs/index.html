@@ -14,7 +14,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-  <link rel="stylesheet" href="styles.css?v=20260923c">
+  <link rel="stylesheet" href="styles.css?v=20260923d">
   <script src="config.js"></script>
 </head>
 <body>
@@ -64,6 +64,10 @@
       <!-- 대화 -->
       <section id="view-chat" class="view" data-view="chat">
         <div id="chat-log" class="chat-log" aria-live="polite" aria-relevant="additions"></div>
+        <button type="button" id="tools-toggle" class="tools-bar" aria-expanded="false" aria-controls="chat-tools">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>빠른 질문 · 답변 방식 (<span id="tools-mode">기본</span>)</span>
+        </button>
         <div id="chat-tools" hidden>
         <div class="chips" id="chips"></div>
         <div class="mode-bar" role="radiogroup" aria-label="답변 방식">
@@ -79,9 +83,6 @@
             <button type="button" id="attach-remove" class="btn ghost small" aria-label="첨부 제거">제거</button>
           </div>
           <div class="composer-row">
-            <button type="button" id="tools-toggle" class="icon-btn" aria-expanded="false" aria-controls="chat-tools" aria-label="빠른 질문과 답변 방식 펼치기">
-              <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
             <label class="icon-btn" title="증권사 앱 캡처 올리기">
               <input id="attach" type="file" accept="image/*" hidden>
               <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M4 7h3l2-3h6l2 3h3v12H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
@@ -287,6 +288,6 @@
   </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
-  <script src="app.js?v=20260923c"></script>
+  <script src="app.js?v=20260923d"></script>
 </body>
 </html>

@@ -214,14 +214,13 @@
   function applyMode() {
     document.querySelectorAll(".mode").forEach((b) => b.setAttribute("aria-checked", b.dataset.mode === chatMode ? "true" : "false"));
     $("#mode-hint").textContent = MODE_HINT[chatMode];
-    // 모드 줄을 접어도 지금 모드를 알 수 있게 입력창 안내에 붙인다
-    $("#chat-input").placeholder = `무엇이든 물어보세요 · ${$(`.mode[data-mode="${chatMode}"]`).textContent}`;
+    // 모드 줄을 접어도 지금 모드를 알 수 있게 접기 줄에 표시한다
+    $("#tools-mode").textContent = $(`.mode[data-mode="${chatMode}"]`).textContent;
   }
   // 빠른 질문·답변 방식 줄 접고 펴기 (기본은 접힘, 마지막 상태 기억)
   function setTools(open) {
     $("#chat-tools").hidden = !open;
     $("#tools-toggle").setAttribute("aria-expanded", open ? "true" : "false");
-    $("#tools-toggle").setAttribute("aria-label", open ? "빠른 질문과 답변 방식 접기" : "빠른 질문과 답변 방식 펼치기");
     store.set("fa_tools", open ? "1" : "0");
   }
   setTools(store.get("fa_tools") === "1");
