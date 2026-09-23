@@ -243,6 +243,17 @@ async function runMorningBrief(env, hour, now) {
   }
 }
 
+// 깊게 작업이 30분 넘게 안 끝나면(집 PC 꺼짐·브릿지 멈춤) 실패로 정리하고 대화창에 알린다
+async function failStaleJobs(env) {
+  const stale = (await env.DB.prepare("SELECT id, user_id FROM jobs WHERE kind IS NULL AND status IN ('queued','running') AND created_at <= datetime('now','+9 hours','-30 minutes')").all()).results;
+  for (const j of stale) {
+    const upd = await env.DB.prepare("UPDATE jobs SET status='failed', error='집 PC가 응답하지 않음', finished_at=datetime('now','+9 hours') WHERE id=? AND status IN ('queued','running')").bind(j.id).run();
+    if (!upd.meta.changes) continue;
+    await env.DB.prepare("INSERT INTO messages (user_id, role, content, created_at) VALUES (?,?,?,datetime('now','+9 hours'))")
+      .bind(j.user_id, "model", "깊게 분석을 맡은 집 PC가 응답하지 않아 답을 드리지 못했습니다. '기본'으로 다시 물어봐 주시거나, 나중에 '깊게'로 다시 요청해 주세요.").run();
+  }
+}
+
 // 브리핑을 대화창에 올리고, 알림을 켠 사람에게만 푸시한다
 async function deliverBrief(u, text, short, env) {
   const subs = u.push_enabled ? (await env.DB.prepare("SELECT * FROM push_subs WHERE user_id=?").bind(u.id).all()).results : [];
@@ -542,6 +553,7 @@ export default {
 
   // 매분: 다가오는 일정 알림 + 아침 브리핑. 야간 무음 22~07시, 사용자별 하루 10건 상한, push_enabled 사용자만
   async scheduled(_ev, env) {
+    await failStaleJobs(env);
     const h = kst().getUTCHours();
     if (h >= QUIET_FROM || h < QUIET_TO) return;
     const now = kstStr();
