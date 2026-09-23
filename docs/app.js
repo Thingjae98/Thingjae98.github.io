@@ -350,7 +350,10 @@
 
   // ---------- 일정 ----------
   async function loadEvents() {
-    const { upcoming } = await api("GET", "/events");
+    const { upcoming, market = [] } = await api("GET", "/events");
+    // 시장 일정: 연준·한은·미국 노동통계국 공식 일정 (읽기 전용, 알림 없음)
+    $("#market-list").innerHTML = market.length ? market.map((m) => `<div class="item"><div class="item-main"><div class="item-title">${esc(m.title)}</div><div class="item-sub">${dayLabel(m.date + " " + (m.time || "")).trim()}${m.time ? "" : " · 시각 미정"} · <a href="${esc(m.source)}" target="_blank" rel="noopener noreferrer">출처</a></div></div></div>`).join("")
+      : `<div class="empty-row">앞으로 60일 안에 잡힌 시장 일정이 없습니다.</div>`;
     $("#events-list").innerHTML = upcoming.length ? upcoming.map((e) => `<div class="item"><div class="item-main"><div class="item-title">${esc(e.title)}</div><div class="item-sub">${dayLabel(e.at)}${e.repeat !== "none" ? ` · ${e.repeat === "weekly" ? "매주" : "매일"}` : ""} · ${e.remind_min ? e.remind_min + "분 전 알림" : "정각 알림"}</div></div>
       <button class="del" type="button" data-del-event="${e.id}" aria-label="${esc(e.title)} 삭제"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>`).join("")
       : `<div class="empty-row">앞으로 30일 안에 잡힌 일정이 없습니다. 아래에서 추가하거나 대화로 "토요일 3시 탁구"처럼 말씀하세요.</div>`;

@@ -5,6 +5,7 @@ import { sendPush } from "./push.js";
 import { getFinance, getKeyMetrics } from "./finance.js";
 import { analyzeStyle, riskProfile } from "./profile.js";
 import { buildBrief, NO_HOLDINGS_NOTE } from "./brief.js";
+import { upcomingMarket } from "./market_calendar.js";
 
 const QUIET_FROM = 22, QUIET_TO = 7, DAILY_PUSH_CAP = 10, SESSION_DAYS = 30;
 
@@ -471,7 +472,7 @@ export default {
       if (p.startsWith("/holdings/") && req.method === "DELETE") { await db.prepare("DELETE FROM holdings WHERE id=? AND user_id=?").bind(idOf("/holdings/"), user.id).run(); return json({ ok: true }, 200, origin); }
       if (p === "/trades" && req.method === "GET") return json({ trades: (await db.prepare("SELECT * FROM trades WHERE user_id=? ORDER BY trade_date DESC, id DESC LIMIT 200").bind(user.id).all()).results }, 200, origin);
       if (p.startsWith("/trades/") && req.method === "DELETE") { await db.prepare("DELETE FROM trades WHERE id=? AND user_id=?").bind(idOf("/trades/"), user.id).run(); return json({ ok: true }, 200, origin); }
-      if (p === "/events" && req.method === "GET") return json({ upcoming: await upcomingEvents(user.id, 30, env), all: (await db.prepare("SELECT * FROM events WHERE user_id=? ORDER BY start_at").bind(user.id).all()).results }, 200, origin);
+      if (p === "/events" && req.method === "GET") return json({ upcoming: await upcomingEvents(user.id, 30, env), market: upcomingMarket(kstStr().slice(0, 10), 60), all: (await db.prepare("SELECT * FROM events WHERE user_id=? ORDER BY start_at").bind(user.id).all()).results }, 200, origin);
       if (p === "/events" && req.method === "POST") return json(await makeToolRunner(user, env)("add_event", body), 200, origin);
       if (p.startsWith("/events/") && req.method === "DELETE") { await db.prepare("DELETE FROM events WHERE id=? AND user_id=?").bind(idOf("/events/"), user.id).run(); return json({ ok: true }, 200, origin); }
       if (p === "/memories" && req.method === "GET") return json({ memories: (await db.prepare("SELECT * FROM memories WHERE user_id=? ORDER BY id DESC").bind(user.id).all()).results }, 200, origin);
