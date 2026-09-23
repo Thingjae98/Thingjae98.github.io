@@ -341,6 +341,9 @@ export default {
         const u = await env.DB.prepare("SELECT * FROM users WHERE handle=?").bind((handle || "").trim().toUpperCase()).first();
         if (!u) return json({ error: "초대 코드를 찾을 수 없습니다" }, 404, origin);
         if (u.pin_hash) return json({ error: "이미 등록된 코드입니다. 로그인으로 들어가세요" }, 409, origin);
+        // 초대·초기화 후 24시간이 지나면 등록을 막는다 (코드를 아는 다른 사람이 먼저 가로채지 못하게)
+        if ((u.pin_reset_at || u.created_at) < kstStr(new Date(Date.now() - 86400e3)))
+          return json({ error: "초대 코드 등록 기한(24시간)이 지났습니다. 관리자에게 비밀번호 초기화를 다시 요청해 주세요" }, 403, origin);
         await env.DB.prepare("UPDATE users SET pin_hash=? WHERE id=?").bind(await hashPin(u.handle, pin), u.id).run();
         return json(await newSession(u, env), 200, origin);
       }
@@ -348,7 +351,18 @@ export default {
         const { handle, pin } = body;
         const u = await env.DB.prepare("SELECT * FROM users WHERE handle=?").bind((handle || "").trim().toUpperCase()).first();
         if (!u || !u.pin_hash) return json({ error: "코드를 찾을 수 없습니다" }, 404, origin);
-        if ((await hashPin(u.handle, pin || "")) !== u.pin_hash) return json({ error: "PIN이 맞지 않습니다" }, 401, origin);
+        // 5번 틀리면 15분 잠금
+        if (u.locked_until && u.locked_until > kstStr()) return json({ error: `비밀번호를 5번 틀려 ${u.locked_until.slice(11, 16)}까지 잠겼습니다. 잠시 후 다시 하시거나 관리자에게 초기화를 요청해 주세요` }, 429, origin);
+        if ((await hashPin(u.handle, pin || "")) !== u.pin_hash) {
+          const fails = (u.fail_count || 0) + 1;
+          if (fails >= 5) {
+            await env.DB.prepare("UPDATE users SET fail_count=0, locked_until=? WHERE id=?").bind(kstStr(new Date(Date.now() + 15 * 60e3)), u.id).run();
+            return json({ error: "비밀번호를 5번 틀려 15분간 잠겼습니다" }, 429, origin);
+          }
+          await env.DB.prepare("UPDATE users SET fail_count=? WHERE id=?").bind(fails, u.id).run();
+          return json({ error: `PIN이 맞지 않습니다 (${fails}/5회)` }, 401, origin);
+        }
+        if (u.fail_count || u.locked_until) await env.DB.prepare("UPDATE users SET fail_count=0, locked_until=NULL WHERE id=?").bind(u.id).run();
         return json(await newSession(u, env), 200, origin);
       }
       if (p === "/push/vapid") return json({ key: env.VAPID_PUBLIC }, 200, origin);
@@ -473,7 +487,7 @@ export default {
             if ("account_type" in body) await db.prepare("UPDATE users SET account_type=? WHERE id=?").bind(body.account_type === "general" ? "general" : "pension", uid).run();
             if ("name" in body) await db.prepare("UPDATE users SET name=? WHERE id=?").bind(String(body.name).trim(), uid).run();
             if (body.reset_pin) {
-              await db.prepare("UPDATE users SET pin_hash=NULL WHERE id=?").bind(uid).run();
+              await db.prepare("UPDATE users SET pin_hash=NULL, fail_count=0, locked_until=NULL, pin_reset_at=? WHERE id=?").bind(kstStr(), uid).run();
               await db.prepare("DELETE FROM sessions WHERE user_id=?").bind(uid).run();
             }
             return json({ ok: true }, 200, origin);

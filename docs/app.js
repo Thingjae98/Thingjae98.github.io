@@ -475,7 +475,7 @@
   document.addEventListener("click", async (e) => {
     const reset = e.target.closest("[data-reset]"), del = e.target.closest("[data-deluser]");
     try {
-      if (reset && confirm(`${reset.dataset.name}님의 비밀번호를 지울까요? 다음에 들어올 때 새로 정하게 됩니다.`)) {
+      if (reset && confirm(`${reset.dataset.name}님의 비밀번호를 지울까요? 24시간 안에 같은 초대 코드로 들어와 새로 정해야 합니다.`)) {
         await api("PATCH", "/admin/users/" + reset.dataset.reset, { reset_pin: true }); toast("초기화했습니다."); loadAdmin();
       }
       if (del && confirm(`${del.dataset.name}님의 계정과 모든 기록을 지울까요? 되돌릴 수 없습니다.`)) {
