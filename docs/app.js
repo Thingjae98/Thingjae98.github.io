@@ -137,7 +137,17 @@
   let chatLoaded = false;
   function renderMd(text) {
     const safe = esc(text);
-    try { return marked.parse(safe, { breaks: true, gfm: true }); } catch { return `<p>${safe.replace(/\n/g, "<br>")}</p>`; }
+    let html;
+    try { html = marked.parse(safe, { breaks: true, gfm: true }); } catch { return `<p>${safe.replace(/\n/g, "<br>")}</p>`; }
+    // 보안: 답에 섞인 javascript: 같은 링크로 로그인 정보가 빠져나가지 않게 http(s) 링크만 남긴다. 외부 이미지는 글자로 바꾼다
+    const t = document.createElement("template");
+    t.innerHTML = html;
+    t.content.querySelectorAll("a").forEach((a) => {
+      if (/^https?:\/\//i.test(a.getAttribute("href") || "")) { a.target = "_blank"; a.rel = "noopener noreferrer"; }
+      else a.replaceWith(document.createTextNode(a.textContent));
+    });
+    t.content.querySelectorAll("img").forEach((img) => img.replaceWith(document.createTextNode(img.alt || "")));
+    return t.innerHTML;
   }
   function addMsg(role, content, opts = {}) {
     const log = $("#chat-log");
