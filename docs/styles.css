@@ -153,7 +153,9 @@ img { max-width: 100%; display: block; }
   .nav .tab:hover { background: var(--panel-2); }
   .side-foot { margin-top: auto; padding: 0 8px; font-size: 0.89rem; }
   .tabbar { display: none; }
-  .view { padding: 24px; }
+  /* 데스크톱: 본문을 넓게 쓰고 좌우 여백을 따로 둔다 */
+  .view { padding: 24px 40px; max-width: 1200px; }
+  .view[data-view="chat"] { max-width: 1200px; }
 }
 
 /* ----- 채팅 ----- */
@@ -293,6 +295,8 @@ img { max-width: 100%; display: block; }
   .chips { padding: 6px 24px; }
   .composer { padding: 12px 24px; }
   .msg { max-width: 86%; }
+  /* 데스크톱에서는 표 칸 안에서 줄을 바꿔 말풍선 폭 안에 표 전체가 들어오게 한다 (휴대폰은 한 줄 유지 + 옆으로 밀기) */
+  .bubble th, .bubble td { white-space: normal; min-width: 5em; }
 }
 
 /* ----- 답변 방식 선택 ----- */

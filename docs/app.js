@@ -191,6 +191,7 @@
     if (chatLoaded) return;
     const { messages } = await api("GET", "/messages");
     const log = $("#chat-log"); log.innerHTML = ""; lastDay = null;
+    log.style.scrollBehavior = "auto"; // 불러오는 동안은 부드러운 스크롤을 끈다 (중간에 멈추지 않게)
     if (!messages.length) {
       log.innerHTML = `<div class="empty"><strong>${esc(me.name)}${esc(me.honorific)}, 안녕하세요.</strong>종목 이름을 말씀하시면 현재가와 퇴직연금 계좌로 살 수 있는지 바로 알려드립니다. 아래 버튼을 눌러 시작해도 됩니다.</div>`;
     }
@@ -201,7 +202,9 @@
       addMsg(m.role, m.content, { time: timeLabel(m.created_at), document: doc, day: m.created_at.slice(0, 10) });
     }
     // 처음 열 때는 부드러운 스크롤 없이 곧장 최근 대화(맨 아래)로 간다
-    log.style.scrollBehavior = "auto"; log.scrollTop = log.scrollHeight; log.style.scrollBehavior = "";
+    log.scrollTop = log.scrollHeight;
+    // 웹 글꼴이 늦게 적용돼 높이가 늘어나도 맨 아래에 머물게 한 번 더 맞춘 뒤 부드러운 스크롤을 되돌린다
+    (document.fonts?.ready || Promise.resolve()).then(() => { log.scrollTop = log.scrollHeight; log.style.scrollBehavior = ""; });
     chatLoaded = true;
     resumePendingJobs();
   }
