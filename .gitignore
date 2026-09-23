@@ -7,3 +7,4 @@ data/kodex_api.json
 notes/
 bridge/.env
 bridge/bridge.log
+data/update_rules.log
