@@ -19,7 +19,13 @@ async function vapidJwt(endpoint, privateJwk, sub) {
 }
 
 /** sub: {endpoint,p256dh,auth}  payload: object → JSON. env: VAPID_PRIVATE_JWK(JSON 문자열), VAPID_PUBLIC(base64url 65바이트), VAPID_SUBJECT(mailto:) */
+/** 한 구독에 푸시를 보낸다. 실패해도 던지지 않고 결과로 돌려준다 (한 건 실패가 브리핑 저장·다른 사람 알림을 막지 않게) */
 export async function sendPush(sub, payload, env) {
+  try { return await sendPushRaw(sub, payload, env); }
+  catch (e) { return { status: 0, gone: false, error: String(e.message || e) }; }
+}
+
+async function sendPushRaw(sub, payload, env) {
   const uaPub = unb64u(sub.p256dh);
   const authSecret = unb64u(sub.auth);
   const local = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);

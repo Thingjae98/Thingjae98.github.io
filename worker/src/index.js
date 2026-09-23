@@ -227,10 +227,11 @@ async function runMorningBrief(env, hour, now) {
     } catch (e) { /* 한 사람 실패가 다른 사람을 막지 않는다 */ }
   }
   // 20분 넘게 안 끝난 브리핑은 취소하고 Gemini 로 대신 만든다
-  const stale = (await env.DB.prepare("SELECT id, user_id FROM jobs WHERE kind='brief' AND status IN ('queued','running') AND created_at <= datetime('now','+9 hours','-20 minutes')").all()).results;
+  const stale = (await env.DB.prepare("SELECT id, user_id, created_at FROM jobs WHERE kind='brief' AND status IN ('queued','running') AND created_at <= datetime('now','+9 hours','-20 minutes')").all()).results;
   for (const j of stale) {
     const upd = await env.DB.prepare("UPDATE jobs SET status='canceled', finished_at=datetime('now','+9 hours') WHERE id=? AND status IN ('queued','running')").bind(j.id).run();
     if (!upd.meta.changes) continue;
+    if (j.created_at.slice(0, 10) !== today) continue; // 어제 것은 대신 만들지 않는다 (오늘 브리핑과 겹치지 않게)
     try {
       const u = await env.DB.prepare("SELECT * FROM users WHERE id=?").bind(j.user_id).first();
       const holdings = (await env.DB.prepare("SELECT code, name, qty FROM holdings WHERE user_id=?").bind(u.id).all()).results;
@@ -254,17 +255,24 @@ async function failStaleJobs(env) {
   }
 }
 
-// 브리핑을 대화창에 올리고, 알림을 켠 사람에게만 푸시한다
+// 푸시를 보내도 되는지: 알림 켬 + 야간 무음(22~07시) 밖 + 오늘 발송 상한 미만
+async function canPush(u, env) {
+  const h = kst().getUTCHours();
+  if (!u?.push_enabled || h >= QUIET_FROM || h < QUIET_TO) return false;
+  const sentToday = (await env.DB.prepare("SELECT COUNT(*) c FROM push_log WHERE user_id=? AND sent_at >= date('now','+9 hours')").bind(u.id).first()).c;
+  return sentToday < DAILY_PUSH_CAP;
+}
+
+// 브리핑을 대화창에 먼저 올리고(알림이 실패해도 브리핑은 남게), 보내도 될 때만 푸시한다
 async function deliverBrief(u, text, short, env) {
-  const subs = u.push_enabled ? (await env.DB.prepare("SELECT * FROM push_subs WHERE user_id=?").bind(u.id).all()).results : [];
+  await env.DB.prepare("INSERT INTO messages (user_id, role, content, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(u.id, "model", text).run();
+  if (!(await canPush(u, env))) return;
+  const subs = (await env.DB.prepare("SELECT * FROM push_subs WHERE user_id=?").bind(u.id).all()).results;
   for (const sb of subs) {
     const r = await sendPush(sb, { title: `${u.agent_name} 아침 브리핑`, body: short, url: "/#chat" }, env);
     if (r.gone) await env.DB.prepare("DELETE FROM push_subs WHERE id=?").bind(sb.id).run();
   }
-  await env.DB.batch([
-    env.DB.prepare("INSERT INTO messages (user_id, role, content, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(u.id, "model", text),
-    ...(subs.length ? [env.DB.prepare("INSERT INTO push_log (user_id, title, sent_at) VALUES (?,?,datetime('now','+9 hours'))").bind(u.id, "아침 브리핑")] : []),
-  ]);
+  if (subs.length) await env.DB.prepare("INSERT INTO push_log (user_id, title, sent_at) VALUES (?,?,datetime('now','+9 hours'))").bind(u.id, "아침 브리핑").run();
 }
 
 const pub = (u) => ({ id: u.id, handle: u.handle, name: u.name, agent_name: u.agent_name, honorific: u.honorific, tone: u.tone, push_enabled: !!u.push_enabled, total_balance: u.total_balance, is_admin: !!u.is_admin, account_type: u.account_type || 'pension', brief_enabled: !!u.brief_enabled, brief_hour: u.brief_hour ?? 8 });
@@ -410,8 +418,10 @@ export default {
               if (d && d.title && Array.isArray(d.sections)) { doc = JSON.stringify({ ...d, format: d.format === "pptx" ? "pptx" : "pdf" }); clean = result.slice(0, dm.index).trim(); }
             } catch {}
           }
-          await env.DB.prepare("UPDATE jobs SET status=?, result=?, error=?, document=?, finished_at=datetime('now','+9 hours') WHERE id=?")
+          // 브리핑은 크론이 막 취소한 것과 겹치면 무시한다 (Opus·Gemini 브리핑이 둘 다 가지 않게)
+          const fin = await env.DB.prepare(`UPDATE jobs SET status=?, result=?, error=?, document=?, finished_at=datetime('now','+9 hours') WHERE id=?${job.kind === "brief" ? " AND status IN ('queued','running')" : ""}`)
             .bind(error ? "failed" : "done", clean, error ?? null, doc, job_id).run();
+          if (!fin.meta.changes) return json({ ok: true, ignored: true }, 200, origin);
           const text = error ? `요청하신 분석을 마치지 못했습니다. (${String(error).slice(0, 200)})` : clean;
           if (job.kind === "brief") {
             const bu = await env.DB.prepare("SELECT * FROM users WHERE id=?").bind(job.user_id).first();
@@ -420,9 +430,8 @@ export default {
           }
           await env.DB.prepare("INSERT INTO messages (user_id, role, content, document, created_at) VALUES (?,?,?,?,datetime('now','+9 hours'))").bind(job.user_id, "model", text, doc).run();
           const subs = (await env.DB.prepare("SELECT * FROM push_subs WHERE user_id=?").bind(job.user_id).all()).results;
-          const u = await env.DB.prepare("SELECT agent_name, push_enabled FROM users WHERE id=?").bind(job.user_id).first();
-          const hour = kst().getUTCHours();
-          if (u?.push_enabled && hour >= QUIET_TO && hour < QUIET_FROM) {
+          const u = await env.DB.prepare("SELECT id, agent_name, push_enabled FROM users WHERE id=?").bind(job.user_id).first();
+          if (await canPush(u, env)) {
             for (const s of subs) { const rr = await sendPush(s, { title: `${u.agent_name} 분석 완료`, body: String(text).slice(0, 120), url: "/#chat" }, env); if (rr.gone) await env.DB.prepare("DELETE FROM push_subs WHERE id=?").bind(s.id).run(); }
             await env.DB.prepare("INSERT INTO push_log (user_id, title, sent_at) VALUES (?,?,datetime('now','+9 hours'))").bind(job.user_id, "분석 완료").run();
           }
