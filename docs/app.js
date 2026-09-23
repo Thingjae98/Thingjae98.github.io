@@ -174,9 +174,9 @@
     resumePendingJobs();
   }
   const MODE_HINT = {
-    fast: "제미나이 라이트 모델. 시세·일정처럼 간단한 것을 빠르고 싸게 답합니다.",
-    smart: "제미나이 플래시 모델. 종목 분석과 뉴스까지 대부분 여기서 처리합니다.",
-    deep: "클로드 오퍼스 모델이 집 PC에서 깊이 조사합니다. 몇 분 걸리고 답은 나중에 도착합니다.",
+    fast: "Gemini Flash Lite",
+    smart: "Gemini Flash",
+    deep: "Claude Opus",
   };
   let chatMode = store.get("fa_mode") || "smart";
   function applyMode() {
@@ -478,6 +478,10 @@
       try {
         const { jobs } = await api("GET", "/jobs");
         const j = jobs.find((x) => x.id === id);
+        if (j?.status === "canceled") { // 늦어진 아침 브리핑은 서버가 대신 만들어 대화에 올렸다
+          el.remove(); watching.delete(id); chatLoaded = false; loadChat();
+          return;
+        }
         if (j && (j.status === "done" || j.status === "failed")) {
           el.remove(); watching.delete(id);
           let doc = null;

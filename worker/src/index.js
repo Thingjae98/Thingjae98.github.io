@@ -184,7 +184,8 @@ async function buildSystem(user, env) {
     "역할: 퇴직연금(DC/IRP) 계좌로 ETF를 매매하는 사용자의 리서치·복기·규정 점검·일정 관리 비서. 탁구와 성당 활동을 즐기는 분이니 그 맥락을 안다.",
     "절대 규칙:",
     "- 주문을 실행하거나 실행한 척하지 않는다. 매매는 사용자가 증권사 앱에서 직접 한다.",
-    "- 특정 종목을 사라/팔라고 단정하지 않는다. 판단 재료(시세·규정·뉴스·본인 매매기록)를 정리해 주고 결정은 사용자에게 둔다.",
+    "- 보유 종목이나 입금 배분을 물으면 '유지 / 비중 확대 / 비중 축소' 참고 의견과 편입 비중(예: 5%)을 제안해도 된다. 단 의견마다 근거(시세·규정·뉴스·본인 매매기록)를 붙이고, 퇴직연금이면 위험자산 70% 한도 안에서만 제안하며, '참고 의견이고 결정은 본인 몫'을 한 줄 덧붙인다. 근거가 없으면 의견을 내지 않는다.",
+    "- ETF 구성종목을 물으면, 가진 자료에 구성종목이 없으니 '깊게' 모드로 물어보시면 운용사 자료에서 찾아드린다고 안내한다. 구성종목을 지어내지 않는다.",
     "- 종목 이야기가 나오면 get_quote 로 현재가와 퇴직연금 투자가능 여부를 확인하고, 판정 근거(어느 표·어느 규정)를 한 줄 붙인다. 불가 종목이면 먼저 알린다.",
     "- 규정·세금 답변에는 '최종 확인은 증권사 앱/세무사' 문구를 붙인다. 모르면 모른다고 한다. 숫자를 지어내지 않는다.",
     "- 사용자가 매수·매도했다고 말하면 add_trade 로 기록하고, 이유·목표가·손절선을 한 번만 가볍게 묻는다(강요하지 않는다). 보유 수량도 set_holding 으로 맞춘다.",
@@ -208,29 +209,48 @@ async function buildSystem(user, env) {
   ].join("\n");
 }
 
-// 아침 브리핑: 켠 사람에게 하루 1회, 설정한 시각(한국시간)에. 알림이 꺼져 있으면 대화창에만 올린다
+// 아침 브리핑: 켠 사람에게 하루 1회. 정한 시각이 지났는데 오늘 아직 안 만들었으면(늦게 켠 경우 포함) 만든다.
+// 로컬 PC(클로드 Opus)에 먼저 맡기고, 20분 안에 안 끝나면(PC 꺼짐 등) Gemini 로 대신 만든다.
+const BRIEF_PROMPT = "오늘 아침 브리핑: pension-research 스킬의 '데일리 점검 보고서' 양식으로 써라. 첫 줄은 알림에 그대로 뜨므로 120자 안쪽 요약.";
 async function runMorningBrief(env, hour, now) {
   const today = now.slice(0, 10);
-  const users = (await env.DB.prepare("SELECT * FROM users WHERE brief_enabled=1 AND brief_hour=? AND (brief_last IS NULL OR brief_last<>?)").bind(hour, today).all()).results;
+  const users = (await env.DB.prepare("SELECT * FROM users WHERE brief_enabled=1 AND brief_hour<=? AND (brief_last IS NULL OR brief_last<>?)").bind(hour, today).all()).results;
   for (const u of users) {
-    await env.DB.prepare("UPDATE users SET brief_last=? WHERE id=?").bind(today, u.id).run(); // 먼저 표시해 중복 발송을 막는다
+    await env.DB.prepare("UPDATE users SET brief_last=? WHERE id=?").bind(today, u.id).run(); // 먼저 표시해 중복을 막는다
     try {
-      const subs = u.push_enabled ? (await env.DB.prepare("SELECT * FROM push_subs WHERE user_id=?").bind(u.id).all()).results : [];
+      const events = (await upcomingEvents(u.id, 1, env)).filter((e) => e.at.slice(0, 10) === today);
+      const ctx = (await deepContext(u, env)) + (events.length ? "\n오늘 일정:\n" + events.map((e) => `- ${e.at.slice(11)} ${e.title}`).join("\n") : "");
+      await env.DB.prepare("INSERT INTO jobs (user_id, prompt, context, kind) VALUES (?,?,?,'brief')").bind(u.id, BRIEF_PROMPT, ctx).run();
+    } catch (e) { /* 한 사람 실패가 다른 사람을 막지 않는다 */ }
+  }
+  // 20분 넘게 안 끝난 브리핑은 취소하고 Gemini 로 대신 만든다
+  const stale = (await env.DB.prepare("SELECT id, user_id FROM jobs WHERE kind='brief' AND status IN ('queued','running') AND created_at <= datetime('now','+9 hours','-20 minutes')").all()).results;
+  for (const j of stale) {
+    const upd = await env.DB.prepare("UPDATE jobs SET status='canceled', finished_at=datetime('now','+9 hours') WHERE id=? AND status IN ('queued','running')").bind(j.id).run();
+    if (!upd.meta.changes) continue;
+    try {
+      const u = await env.DB.prepare("SELECT * FROM users WHERE id=?").bind(j.user_id).first();
       const holdings = (await env.DB.prepare("SELECT code, name, qty FROM holdings WHERE user_id=?").bind(u.id).all()).results;
       const events = (await upcomingEvents(u.id, 1, env)).filter((e) => e.at.slice(0, 10) === today);
       const brief = await buildBrief(u, env, { holdings, events });
       if (!brief) continue;
-      for (const sb of subs) {
-        const r = await sendPush(sb, { title: `${u.agent_name} 아침 브리핑`, body: brief.short, url: "/#chat" }, env);
-        if (r.gone) await env.DB.prepare("DELETE FROM push_subs WHERE id=?").bind(sb.id).run();
-      }
-      await env.DB.batch([
-        env.DB.prepare("INSERT INTO messages (user_id, role, content, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(u.id, "model", brief.text),
-        ...(subs.length ? [env.DB.prepare("INSERT INTO push_log (user_id, title, sent_at) VALUES (?,?,datetime('now','+9 hours'))").bind(u.id, "아침 브리핑")] : []),
-        env.DB.prepare("INSERT INTO usage_log (user_id, in_tokens, out_tokens, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(u.id, brief.usage.in, brief.usage.out),
-      ]);
+      await deliverBrief(u, brief.text, brief.short, env);
+      await env.DB.prepare("INSERT INTO usage_log (user_id, in_tokens, out_tokens, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(u.id, brief.usage.in, brief.usage.out).run();
     } catch (e) { /* 한 사람 실패가 다른 사람을 막지 않는다 */ }
   }
+}
+
+// 브리핑을 대화창에 올리고, 알림을 켠 사람에게만 푸시한다
+async function deliverBrief(u, text, short, env) {
+  const subs = u.push_enabled ? (await env.DB.prepare("SELECT * FROM push_subs WHERE user_id=?").bind(u.id).all()).results : [];
+  for (const sb of subs) {
+    const r = await sendPush(sb, { title: `${u.agent_name} 아침 브리핑`, body: short, url: "/#chat" }, env);
+    if (r.gone) await env.DB.prepare("DELETE FROM push_subs WHERE id=?").bind(sb.id).run();
+  }
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO messages (user_id, role, content, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(u.id, "model", text),
+    ...(subs.length ? [env.DB.prepare("INSERT INTO push_log (user_id, title, sent_at) VALUES (?,?,datetime('now','+9 hours'))").bind(u.id, "아침 브리핑")] : []),
+  ]);
 }
 
 const pub = (u) => ({ id: u.id, handle: u.handle, name: u.name, agent_name: u.agent_name, honorific: u.honorific, tone: u.tone, push_enabled: !!u.push_enabled, total_balance: u.total_balance, is_admin: !!u.is_admin, account_type: u.account_type || 'pension', brief_enabled: !!u.brief_enabled, brief_hour: u.brief_hour ?? 8 });
@@ -242,6 +262,30 @@ async function newSession(u, env) {
   return { token, user: pub(u) };
 }
 
+// 로컬 PC(클로드)는 네이버 금융에 직접 붙지 못하므로, 서버가 가진 확정 수치를 미리 실어 보낸다
+async function deepContext(user, env) {
+  const holdings = (await env.DB.prepare("SELECT name, code, qty, weight_pct FROM holdings WHERE user_id=?").bind(user.id).all()).results;
+  const memos = (await env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY id DESC LIMIT 20").bind(user.id).all()).results;
+  const detail = [];
+  for (const h of holdings.slice(0, 12)) {
+    if (!h.code) { detail.push(`- ${h.name}`); continue; }
+    try {
+      const q = await getQuote(h.code, env);
+      const pv = checkPension({ code: q.code, name: q.name, kind: q.kind, accountType: user.account_type });
+      detail.push(`- ${q.name}(${q.code}) 현재가 ${q.price?.toLocaleString()}원, 전일대비 ${q.changeRate}%`
+        + (h.qty ? `, ${h.qty}주` : "") + (h.weight_pct ? `, 비중 ${h.weight_pct}%` : "")
+        + (user.account_type === "general" ? "" : `, 퇴직연금 ${pv.verdict}${pv.group ? " " + pv.group + "%" : ""}`));
+    } catch { detail.push(`- ${h.name}${h.weight_pct ? ` 비중 ${h.weight_pct}%` : ""}`); }
+  }
+  return [
+    detail.length ? "보유 종목 (서버에서 방금 조회한 확정 수치):\n" + detail.join("\n") : "",
+    user.total_balance ? `계좌 총액: ${user.total_balance.toLocaleString()}원` : "",
+    memos.length ? "기억하는 것: " + memos.map((m) => m.content).join(" / ") : "",
+    user.account_type === "general" ? "계좌: 일반 위탁계좌" : "계좌: 퇴직연금(DC/IRP). 개별주식·레버리지·인버스 매수 불가, 위험자산 70% 한도.",
+    "위 수치는 확정된 값이니 그대로 쓰면 된다. 시세를 웹에서 다시 찾지 말 것. 뉴스·업황은 검색해도 좋다.",
+  ].filter(Boolean).join("\n");
+}
+
 async function handleChat(user, body, env) {
   const text = (body.text || "").trim();
   const image = body.image; // { mimeType, data(base64) }
@@ -250,27 +294,7 @@ async function handleChat(user, body, env) {
 
   // 깊게: LLM 을 거치지 않고 바로 로컬 PC 작업 대기줄로 넘긴다
   if (mode === "deep" && text) {
-    const holdings = (await env.DB.prepare("SELECT name, code, qty, weight_pct FROM holdings WHERE user_id=?").bind(user.id).all()).results;
-    const memos = (await env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY id DESC LIMIT 20").bind(user.id).all()).results;
-    // 클로드 쪽에서는 네이버 금융에 직접 붙지 못하므로, 서버가 가진 확정 수치를 미리 실어 보낸다
-    const detail = [];
-    for (const h of holdings.slice(0, 12)) {
-      if (!h.code) { detail.push(`- ${h.name}`); continue; }
-      try {
-        const q = await getQuote(h.code, env);
-        const pv = checkPension({ code: q.code, name: q.name, kind: q.kind, accountType: user.account_type });
-        detail.push(`- ${q.name}(${q.code}) 현재가 ${q.price?.toLocaleString()}원, 전일대비 ${q.changeRate}%`
-          + (h.qty ? `, ${h.qty}주` : "") + (h.weight_pct ? `, 비중 ${h.weight_pct}%` : "")
-          + (user.account_type === "general" ? "" : `, 퇴직연금 ${pv.verdict}${pv.group ? " " + pv.group + "%" : ""}`));
-      } catch { detail.push(`- ${h.name}${h.weight_pct ? ` 비중 ${h.weight_pct}%` : ""}`); }
-    }
-    const ctxLines = [
-      detail.length ? "보유 종목 (서버에서 방금 조회한 확정 수치):\n" + detail.join("\n") : "",
-      user.total_balance ? `계좌 총액: ${user.total_balance.toLocaleString()}원` : "",
-      memos.length ? "기억하는 것: " + memos.map((m) => m.content).join(" / ") : "",
-      user.account_type === "general" ? "계좌: 일반 위탁계좌" : "계좌: 퇴직연금(DC/IRP). 개별주식·레버리지·인버스 매수 불가, 위험자산 70% 한도.",
-      "위 수치는 확정된 값이니 그대로 쓰면 된다. 시세를 웹에서 다시 찾지 말 것. 뉴스·업황은 검색해도 좋다.",
-    ].filter(Boolean).join("\n");
+    const ctxLines = await deepContext(user, env);
     const r = await env.DB.prepare("INSERT INTO jobs (user_id, prompt, context) VALUES (?,?,?)").bind(user.id, text, ctxLines || null).run();
     const reply = "깊이 알아보고 있습니다. 준비되면 알려드리겠습니다.";
     await env.DB.batch([
@@ -334,8 +358,8 @@ export default {
           const upd = await env.DB.prepare("UPDATE jobs SET status='running', claimed_at=datetime('now','+9 hours') WHERE id=? AND status='queued'").bind(job.id).run();
           if (!upd.meta.changes) return json({ job: null }, 200, origin); // 다른 작업자가 먼저 가져감
           const u = await env.DB.prepare("SELECT name, honorific, tone, account_type FROM users WHERE id=?").bind(job.user_id).first();
-          // 이 질문 직전까지의 대화 16개 (대기 안내 문구는 뺀다)
-          const history = (await env.DB.prepare("SELECT role, substr(content,1,800) content FROM messages WHERE user_id=? AND created_at < ? AND content <> '깊이 알아보고 있습니다. 준비되면 알려드리겠습니다.' ORDER BY id DESC LIMIT 16").bind(job.user_id, job.created_at).all()).results.reverse();
+          // 이 질문 직전까지의 대화 16개 (대기 안내 문구는 뺀다). 아침 브리핑은 매번 새로 쓰므로 넘기지 않는다
+          const history = job.kind === "brief" ? [] : (await env.DB.prepare("SELECT role, substr(content,1,800) content FROM messages WHERE user_id=? AND created_at < ? AND content <> '깊이 알아보고 있습니다. 준비되면 알려드리겠습니다.' ORDER BY id DESC LIMIT 16").bind(job.user_id, job.created_at).all()).results.reverse();
           return json({ job: { id: job.id, prompt: job.prompt, context: job.context, user: u, history } }, 200, origin);
         }
         if (p === "/worker/progress" && req.method === "POST") {
@@ -346,6 +370,8 @@ export default {
           const { job_id, result, error } = body;
           const job = await env.DB.prepare("SELECT * FROM jobs WHERE id=?").bind(job_id).first();
           if (!job) return json({ error: "없는 작업" }, 404, origin);
+          if (job.status === "canceled") return json({ ok: true, ignored: true }, 200, origin); // 늦게 온 브리핑: 이미 Gemini 로 대신 보냄
+          if (job.kind === "brief" && error) return json({ ok: true }, 200, origin); // 실행 중으로 두면 20분 뒤 Gemini 가 대신 만든다
           // 답 끝의 ```document {...}``` 블록을 떼어 문서로 저장한다
           let clean = result ?? null, doc = null;
           const dm = typeof result === "string" && result.match(/```document\s*([\s\S]*?)```\s*$/);
@@ -358,6 +384,11 @@ export default {
           await env.DB.prepare("UPDATE jobs SET status=?, result=?, error=?, document=?, finished_at=datetime('now','+9 hours') WHERE id=?")
             .bind(error ? "failed" : "done", clean, error ?? null, doc, job_id).run();
           const text = error ? `요청하신 분석을 마치지 못했습니다. (${String(error).slice(0, 200)})` : clean;
+          if (job.kind === "brief") {
+            const bu = await env.DB.prepare("SELECT * FROM users WHERE id=?").bind(job.user_id).first();
+            await deliverBrief(bu, text, text.split("\n").find((l) => l.trim())?.replace(/[#*_`]/g, "").trim().slice(0, 160) || "오늘의 브리핑이 도착했습니다.", env);
+            return json({ ok: true }, 200, origin);
+          }
           await env.DB.prepare("INSERT INTO messages (user_id, role, content, document, created_at) VALUES (?,?,?,?,datetime('now','+9 hours'))").bind(job.user_id, "model", text, doc).run();
           const subs = (await env.DB.prepare("SELECT * FROM push_subs WHERE user_id=?").bind(job.user_id).all()).results;
           const u = await env.DB.prepare("SELECT agent_name, push_enabled FROM users WHERE id=?").bind(job.user_id).first();
