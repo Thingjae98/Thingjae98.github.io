@@ -612,34 +612,10 @@
   async function makePptx(doc) {
     // 발표자료 라이브러리(157KB)는 처음 필요할 때만 읽는다
     if (typeof PptxGenJS !== "function") await new Promise((ok) => { const s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"; s.onload = s.onerror = ok; document.head.appendChild(s); });
-    if (typeof PptxGenJS !== "function") throw new Error("발표자료 기능을 불러오지 못했습니다. 인터넷 연결을 확인하고 다시 해주세요.");
-    const P = new PptxGenJS();
-    P.layout = "LAYOUT_16x9";
-    const FONT = "맑은 고딕", INK = "1F2328", MUTED = "6B7280", BRAND = "A8562A";
-    let s = P.addSlide();
-    s.background = { color: "FFFFFF" };
-    s.addShape(P.ShapeType.rect, { x: 0, y: 2.35, w: 1.2, h: 0.09, fill: { color: BRAND } });
-    s.addText(doc.title || "", { x: 0.9, y: 2.6, w: 8.2, h: 1.1, fontSize: 38, bold: true, color: INK, fontFace: FONT });
-    if (doc.subtitle) s.addText(doc.subtitle, { x: 0.9, y: 3.7, w: 8.2, h: 0.5, fontSize: 16, color: MUTED, fontFace: FONT });
-    s.addShape(P.ShapeType.rect, { x: 0.9, y: 2.45, w: 0.9, h: 0.06, fill: { color: BRAND } });
-    for (const sec of doc.sections || []) {
-      const sl = P.addSlide();
-      sl.background = { color: "FFFFFF" };
-      sl.addText(sec.heading || "", { x: 0.6, y: 0.45, w: 8.8, h: 0.7, fontSize: 26, bold: true, color: INK, fontFace: FONT });
-      sl.addShape(P.ShapeType.rect, { x: 0.6, y: 1.15, w: 0.7, h: 0.05, fill: { color: BRAND } });
-      let y = 1.5;
-      if ((sec.bullets || []).length) {
-        sl.addText(sec.bullets.map((b) => ({ text: b, options: { bullet: { code: "2022" }, breakLine: true } })),
-          { x: 0.7, y, w: 8.6, h: Math.min(3.0, 0.45 * sec.bullets.length + 0.2), fontSize: 16, color: INK, fontFace: FONT, lineSpacingMultiple: 1.25, valign: "top" });
-        y += Math.min(3.0, 0.45 * sec.bullets.length + 0.3);
-      }
-      if (sec.table?.headers?.length) {
-        const head = sec.table.headers.map((h) => ({ text: String(h), options: { bold: true, color: "FFFFFF", fill: { color: BRAND } } }));
-        const body = (sec.table.rows || []).map((r) => r.map((c) => ({ text: String(c) })));
-        sl.addTable([head, ...body], { x: 0.7, y: Math.min(y, 3.6), w: 8.6, fontSize: 13, color: INK, fontFace: FONT, border: { pt: 0.5, color: "D9DCE1" }, align: "left", valign: "middle", rowH: 0.34 });
-      }
-      if (sec.note) sl.addText(sec.note, { x: 0.7, y: 4.85, w: 8.6, h: 0.4, fontSize: 11, color: MUTED, fontFace: FONT, italic: true });
-    }
+    // 디자인 템플릿 3벌(보고서형·발표형·행사형)은 pptx-themes.js 에 있다. 집 PC 브릿지와 같은 파일을 쓴다
+    if (typeof buildDeck !== "function") await new Promise((ok) => { const s = document.createElement("script"); s.src = "pptx-themes.js?v=20260923f"; s.onload = s.onerror = ok; document.head.appendChild(s); });
+    if (typeof PptxGenJS !== "function" || typeof buildDeck !== "function") throw new Error("발표자료 기능을 불러오지 못했습니다. 인터넷 연결을 확인하고 다시 해주세요.");
+    const P = buildDeck(new PptxGenJS(), doc);
     const blob = await P.write({ outputType: "blob" });
     saveBlob(blob, (doc.title || "발표자료").replace(/[\\/:*?"<>|]/g, "").slice(0, 60) + ".pptx");
     toast("발표자료를 저장했습니다. 폰은 다운로드 폴더, PC는 다운로드 창에서 열어보세요.", 7000);

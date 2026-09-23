@@ -25,6 +25,7 @@ export const TOOL_DECLS = [
       type: "OBJECT",
       properties: {
         format: { type: "STRING", enum: ["pdf", "pptx"], description: "pdf=읽는 문서, pptx=발표자료" },
+        template: { type: "STRING", enum: ["report", "pitch", "event"], description: "발표자료 디자인. report=보고서형(투자·재무·점검 정리), pitch=발표형(설명·소개·발표), event=행사형(어린이집·모임·행사 안내). 주제에 맞게 고른다" },
         title: { type: "STRING", description: "문서 제목, 30자 이내" },
         subtitle: { type: "STRING", description: "부제 또는 작성일·출처 한 줄" },
         sections: {

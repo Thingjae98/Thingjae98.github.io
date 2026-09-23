@@ -53,8 +53,9 @@ description: 가족 금융비서 앱의 '깊게' 요청을 처리하는 조사·
 본문은 5줄 안쪽 요약으로 쓰고, 답 맨 끝에 ```document 로 시작하는 코드블록 하나에 JSON 을 넣는다. 화면이 이 JSON 으로 실제 파일을 만든다.
 
 ```
-{"format":"pdf 또는 pptx(발표자료·PPT면 pptx)","title":"30자 이내","subtitle":"작성일·출처 한 줄",
+{"format":"pdf 또는 pptx(발표자료·PPT면 pptx)","template":"report·pitch·event 중 하나","title":"30자 이내","subtitle":"작성일·출처 한 줄",
  "sections":[{"heading":"30자 이내","bullets":["60자 이내 3~5개"],
    "table":{"headers":["열 4개 이내"],"rows":[["행 6개 이내"]]},"note":"출처나 주의 한 줄"}]}
 ```
 sections 는 4~8개. table·note 는 필요할 때만 넣는다.
+template 은 디자인이다: report=보고서형(투자·재무·점검 정리), pitch=발표형(설명·소개·발표), event=행사형(어린이집·모임·행사 안내). 주제에 맞게 고른다.
