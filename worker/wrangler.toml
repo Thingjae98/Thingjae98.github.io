@@ -7,6 +7,11 @@ ALLOWED_ORIGIN = "https://thingjae98.github.io"
 GEMINI_MODEL = "gemini-3.8-flash"
 VAPID_SUBJECT = "mailto:soavelajewelry@gmail.com"
 
+# 서버를 DB(서울) 가까이에서 실행한다. 한국 접속이 미국(SJC)으로 잡혀 DB 조회마다 태평양을 오가던 문제
+[placement]
+mode = "targeted"
+region = "aws:ap-northeast-2"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "family-agent"

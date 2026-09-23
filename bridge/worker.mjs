@@ -51,44 +51,60 @@ async function report(job_id, result, error) {
   if (!r.ok) log("결과 전송 실패", r.status, await r.text().catch(() => ""));
 }
 
-/** 클로드 코드를 한 번 호출한다. 실패하면 에러 문자열을 던진다. */
-function runClaude(prompt) {
+async function progress(job_id, text) {
+  await fetch(API + "/worker/progress", {
+    method: "POST",
+    headers: { "X-Worker-Key": KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ job_id, progress: text }),
+  }).catch(() => {});
+}
+
+/** 도구 호출을 사람이 읽을 진행 문구로 바꾼다 */
+function stepLabel(tool) {
+  if (tool.name === "WebSearch") return "자료 검색 중: " + String(tool.input?.query || "").slice(0, 30);
+  if (tool.name === "WebFetch") { try { return "자료 읽는 중: " + new URL(tool.input.url).hostname; } catch { return "자료 읽는 중"; } }
+  if (tool.name === "Skill") return "분석 방법 확인 중";
+  return null;
+}
+
+/** 클로드 코드를 한 번 호출한다. 도구를 쓸 때마다 onStep 으로 알린다. 실패하면 에러 문자열을 던진다. */
+function runClaude(prompt, onStep) {
   return new Promise((resolve, reject) => {
     // stdin 을 닫아야 claude 가 입력을 기다리지 않는다. 인자는 배열로 넘겨 이스케이프 문제를 피한다.
-    // 조사에 필요한 읽기 전용 도구만 연다. 파일 쓰기·명령 실행은 주지 않는다.
-    const args = ["-p", prompt, "--allowedTools", "WebSearch", "WebFetch"];
+    // 조사에 필요한 읽기 전용 도구와 스킬만 연다. 파일 쓰기·명령 실행은 주지 않는다.
+    // 모델은 대표님 클로드 코드 기본값과 무관하게 Opus 로 고정한다.
+    const args = ["-p", prompt, "--model", "opus", "--output-format", "stream-json", "--verbose", "--allowedTools", "WebSearch", "WebFetch", "Skill"];
     const p = spawn("claude", args, { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
-    let out = "", err = "";
+    let buf = "", err = "", result = null;
     const timer = setTimeout(() => { p.kill(); reject(new Error("10분을 넘겨 중단했습니다")); }, TIMEOUT_MS);
-    p.stdout.on("data", (d) => (out += d));
+    p.stdout.on("data", (d) => {
+      buf += d;
+      let i;
+      while ((i = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, i); buf = buf.slice(i + 1);
+        let ev; try { ev = JSON.parse(line); } catch { continue; }
+        if (ev.type === "assistant") for (const c of ev.message?.content || []) { if (c.type === "tool_use") { const s = stepLabel(c); if (s) onStep(s); } }
+        if (ev.type === "result") result = ev;
+      }
+    });
     p.stderr.on("data", (d) => (err += d));
     p.on("error", (e) => { clearTimeout(timer); reject(e); });
     p.on("close", (code) => {
       clearTimeout(timer);
-      if (code === 0 && out.trim()) resolve(out.trim());
-      else reject(new Error(err.trim().slice(0, 300) || `클로드 종료 코드 ${code}`));
+      if (result && !result.is_error && String(result.result || "").trim()) resolve(result.result.trim());
+      else reject(new Error(err.trim().slice(0, 300) || String(result?.result || "").slice(0, 300) || `클로드 종료 코드 ${code}`));
     });
   });
 }
 
 function buildPrompt(job) {
   const u = job.user || {};
+  const history = (job.history || []).map((m) => `[${m.role === "user" ? "사용자" : "비서"}] ${m.content}`).join("\n");
   return [
-    `당신은 ${u.name || "사용자"}${u.honorific || "님"}의 개인 투자 비서다. 아래 요청에 대해 조사하고 분석해 답하라.`,
+    `당신은 ${u.name || "사용자"}${u.honorific || "님"}의 개인 투자 비서다. 먼저 pension-research 스킬을 불러 그 지침대로 조사하고 답하라.`,
     `말투: ${u.tone || "존댓말로 간결하게"}`,
-    u.account_type === "general"
-      ? "이 사용자는 일반 위탁계좌를 쓴다. 퇴직연금 규제는 적용되지 않는다."
-      : "이 사용자는 퇴직연금(DC/IRP) 계좌를 쓴다. 개별주식·레버리지·인버스는 매수 불가이고 위험자산은 70% 한도다.",
-    "",
-    "규칙:",
-    "- 특정 종목의 매수·매도를 권하지 않는다. 판단 재료를 정리하고 결정은 사용자에게 맡긴다.",
-    "- 주가가 오를지 내릴지 단정하지 않는다. 숫자는 근거가 있는 것만 쓰고 지어내지 않는다.",
-    "- 읽는 사람은 60대다. 어려운 용어는 처음 나올 때 괄호로 풀어 쓴다.",
-    "- 마크다운 표를 적극 쓰고, 전체 1500자 안쪽으로 정리한다.",
-    "- 세금·규정 이야기에는 '최종 확인은 증권사나 세무사에게' 를 덧붙인다.",
-    "- 요청이 보고서·문서·PDF·발표자료·PPT 를 원할 때만: 본문은 5줄 안쪽 요약으로 쓰고, 답 맨 끝에 ```document 로 시작하는 코드블록 하나에 JSON 을 넣는다.",
-    '  형식: {"format":"pdf 또는 pptx(발표자료·PPT면 pptx)","title":"30자 이내","subtitle":"작성일·출처 한 줄","sections":[{"heading":"30자 이내","bullets":["60자 이내 3~5개"],"table":{"headers":["열 4개 이내"],"rows":[["행 6개 이내"]]},"note":"출처나 주의 한 줄"}]}',
-    "  sections 는 4~8개, table·note 는 필요할 때만 넣는다. 화면이 이 JSON 으로 실제 파일을 만든다.",
+    u.account_type === "general" ? "계좌: 일반 위탁계좌" : "계좌: 퇴직연금(DC/IRP)",
+    history ? "\n이전 대화 (오래된 것부터):\n" + history : "",
     "",
     "요청:",
     job.prompt,
@@ -110,7 +126,8 @@ async function loop() {
       log(`작업 #${job.id} 시작: ${job.prompt.slice(0, 50)}`);
       const started = Date.now();
       try {
-        const out = await runClaude(buildPrompt(job));
+        await progress(job.id, "시작했습니다");
+        const out = await runClaude(buildPrompt(job), (s) => { log(`  #${job.id} ${s}`); progress(job.id, s); });
         await report(job.id, out, null);
         doneToday++;
         log(`작업 #${job.id} 완료 (${Math.round((Date.now() - started) / 1000)}초, 오늘 ${doneToday}건)`);

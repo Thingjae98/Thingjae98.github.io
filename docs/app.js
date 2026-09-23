@@ -242,6 +242,7 @@
   };
   async function loadAssets() {
     const general = me.account_type === "general";
+    const tradesReq = api("GET", "/trades"); // 보유 종목과 동시에 부른다
     const d = await api("GET", "/holdings");
     // 계좌 종류에 따라 자산 화면의 머리말을 바꾼다
     $("#risk-panel-title").textContent = general ? "자산 구성" : "위험자산 비중";
@@ -276,7 +277,7 @@
     }).join("") : `<div class="empty-row">아직 등록된 종목이 없습니다.</div>`;
     $("#holdings-updated").textContent = d.holdings.length ? "현재가 기준" : "";
 
-    const { trades } = await api("GET", "/trades");
+    const { trades } = await tradesReq;
     $("#trades-list").innerHTML = trades.length ? trades.map((t) => `<div class="item"><div class="item-main"><div class="item-title">${t.side === "buy" ? "매수" : "매도"} · ${esc(t.name)}</div><div class="item-sub">${t.trade_date} · ${fmt(t.qty)}주 × ${fmt(t.price)}원${t.reason ? ` · ${esc(t.reason)}` : ""}${t.target_price ? ` · 목표 ${fmt(t.target_price)}` : ""}${t.stop_price ? ` · 손절 ${fmt(t.stop_price)}` : ""}</div></div>
       <button class="del" type="button" data-del-trade="${t.id}" aria-label="기록 삭제"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>`).join("")
       : `<div class="empty-row">매수·매도하신 것을 대화로 말씀하시면 여기 기록됩니다.</div>`;
@@ -484,6 +485,7 @@
           addMsg("model", j.status === "done" ? j.result : `분석을 마치지 못했습니다. (${j.error || "원인 미상"})`, { time: new Date().toTimeString().slice(0, 5), document: doc });
           return;
         }
+        if (j?.progress) el.querySelector(".dots").textContent = j.progress;
       } catch {}
       setTimeout(tick, 15000);
     };
@@ -531,7 +533,9 @@
   }
 
   async function makePptx(doc) {
-    if (typeof PptxGenJS !== "function") throw new Error("발표자료 기능을 불러오지 못했습니다. 새로고침 후 다시 해주세요.");
+    // 발표자료 라이브러리(157KB)는 처음 필요할 때만 읽는다
+    if (typeof PptxGenJS !== "function") await new Promise((ok) => { const s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"; s.onload = s.onerror = ok; document.head.appendChild(s); });
+    if (typeof PptxGenJS !== "function") throw new Error("발표자료 기능을 불러오지 못했습니다. 인터넷 연결을 확인하고 다시 해주세요.");
     const P = new PptxGenJS();
     P.layout = "LAYOUT_16x9";
     const FONT = "맑은 고딕", INK = "1F2328", MUTED = "6B7280", BRAND = "A8562A";

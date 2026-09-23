@@ -40,15 +40,24 @@ async function quoteWithPension(query, env, accountType = "pension") {
   return { ...q, pension: checkPension({ code: q.code, name: q.name, kind: q.kind, accountType }) };
 }
 
+// 자산 화면 시세는 1분간 재사용한다 (같은 서버 인스턴스 안에서만)
+const priceCache = new Map();
+async function cachedPrice(code, env) {
+  const hit = priceCache.get(code);
+  if (hit && Date.now() - hit.at < 60e3) return hit.price;
+  const price = (await getQuote(code, env)).price;
+  priceCache.set(code, { price, at: Date.now() });
+  return price;
+}
+
 async function holdingsWithPrices(user, env) {
   const rows = (await env.DB.prepare("SELECT id, code, name, qty, avg_price, weight_pct FROM holdings WHERE user_id=? ORDER BY id").bind(user.id).all()).results;
-  const priced = [];
-  for (const h of rows) {
+  const priced = await Promise.all(rows.map(async (h) => {
     let price = h.avg_price;
-    if (h.code) { try { price = (await getQuote(h.code, env)).price; } catch {} }
+    if (h.code) { try { price = await cachedPrice(h.code, env); } catch {} }
     const value = h.qty && price ? price * h.qty : (h.weight_pct && user.total_balance ? Math.round((h.weight_pct / 100) * user.total_balance) : null);
-    priced.push({ ...h, price, value });
-  }
+    return { ...h, price, value };
+  }));
   const rr = riskRatio(priced, user.total_balance);
   return { holdings: priced, total_balance: user.total_balance, risk_value: rr.risk, risk_ratio_pct: rr.ratio };
 }
@@ -325,7 +334,13 @@ export default {
           const upd = await env.DB.prepare("UPDATE jobs SET status='running', claimed_at=datetime('now','+9 hours') WHERE id=? AND status='queued'").bind(job.id).run();
           if (!upd.meta.changes) return json({ job: null }, 200, origin); // 다른 작업자가 먼저 가져감
           const u = await env.DB.prepare("SELECT name, honorific, tone, account_type FROM users WHERE id=?").bind(job.user_id).first();
-          return json({ job: { id: job.id, prompt: job.prompt, context: job.context, user: u } }, 200, origin);
+          // 이 질문 직전까지의 대화 16개 (대기 안내 문구는 뺀다)
+          const history = (await env.DB.prepare("SELECT role, substr(content,1,800) content FROM messages WHERE user_id=? AND created_at < ? AND content <> '깊이 알아보고 있습니다. 준비되면 알려드리겠습니다.' ORDER BY id DESC LIMIT 16").bind(job.user_id, job.created_at).all()).results.reverse();
+          return json({ job: { id: job.id, prompt: job.prompt, context: job.context, user: u, history } }, 200, origin);
+        }
+        if (p === "/worker/progress" && req.method === "POST") {
+          await env.DB.prepare("UPDATE jobs SET progress=? WHERE id=? AND status='running'").bind(String(body.progress || "").slice(0, 60), body.job_id).run();
+          return json({ ok: true }, 200, origin);
         }
         if (p === "/worker/result" && req.method === "POST") {
           const { job_id, result, error } = body;
@@ -452,7 +467,7 @@ export default {
 
       // ---------- 작업 대기줄 (사용자) ----------
       if (p === "/jobs" && req.method === "GET") {
-        const rows = (await db.prepare("SELECT id, prompt, status, result, error, document, created_at, finished_at FROM jobs WHERE user_id=? ORDER BY id DESC LIMIT 20").bind(user.id).all()).results;
+        const rows = (await db.prepare("SELECT id, prompt, status, progress, result, error, document, created_at, finished_at FROM jobs WHERE user_id=? ORDER BY id DESC LIMIT 20").bind(user.id).all()).results;
         return json({ jobs: rows }, 200, origin);
       }
 
