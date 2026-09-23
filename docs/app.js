@@ -182,6 +182,7 @@
       log.innerHTML = `<div class="empty"><strong>${esc(me.name)}${esc(me.honorific)}, 안녕하세요.</strong>종목 이름을 말씀하시면 현재가와 퇴직연금 계좌로 살 수 있는지 바로 알려드립니다. 아래 버튼을 눌러 시작해도 됩니다.</div>`;
     }
     for (const m of messages) {
+      if (m.content === "깊이 알아보고 있습니다. 준비되면 알려드리겠습니다.") continue; // 깊게 대기 안내는 진행 말풍선이 대신한다
       let doc = null;
       if (m.document) { try { doc = JSON.parse(m.document); } catch {} }
       addMsg(m.role, m.content, { time: timeLabel(m.created_at), document: doc });
@@ -230,7 +231,8 @@
     try {
       const r = await api("POST", "/chat", { text, mode, image: img ? { mimeType: img.mimeType, data: img.data } : undefined });
       pending.remove();
-      addMsg("model", r.reply, { time: new Date().toTimeString().slice(0, 5), document: r.document });
+      // 깊게로 넘긴 경우 "알아보고 있습니다" 안내는 진행 표시 말풍선 하나로만 보여준다
+      if (!(r.job_id && mode === "deep")) addMsg("model", r.reply, { time: new Date().toTimeString().slice(0, 5), document: r.document });
       if (r.job_id) watchJob(r.job_id);
     } catch (ex) {
       pending.remove();
@@ -286,8 +288,7 @@
     }
     // 비중(%)으로 등록한 종목이 있을 때만: 등록 ETF가 계좌에서 차지하는 비율
     $("#share-wrap").hidden = general || !d.holdings.some((h) => h.weight_pct != null);
-    $("#share-input").value = d.etf_share_pct ?? 100;
-    $("#share-val").textContent = `${d.etf_share_pct ?? 100}%`;
+    setShare(d.etf_share_pct ?? 100);
 
     const hl = $("#holdings-list");
     hl.innerHTML = d.holdings.length ? d.holdings.map((h) => {
@@ -306,7 +307,12 @@
       : `<div class="empty-row">매수·매도하신 것을 대화로 말씀하시면 여기 기록됩니다.</div>`;
   }
 
-  $("#share-input").addEventListener("input", (e) => { $("#share-val").textContent = `${e.target.value}%`; });
+  function setShare(v) {
+    $("#share-input").value = v;
+    $("#share-val").textContent = `${v}%`;
+    $("#share-input").setAttribute("aria-valuetext", `ETF ${v}퍼센트, 안전자산 ${100 - v}퍼센트`);
+  }
+  $("#share-input").addEventListener("input", (e) => setShare(Number(e.target.value)));
   $("#share-input").addEventListener("change", async (e) => {
     try {
       await api("PATCH", "/me", { etf_share_pct: Number(e.target.value) });
@@ -320,22 +326,23 @@
     if (!f) return;
     let img;
     try { img = await shrinkImage(f); } catch { return toast("사진을 읽지 못했습니다."); }
-    toast("사진을 읽고 있습니다. 잠시만 기다려 주세요.", 8000);
+    toast("사진을 읽고 있습니다. 잠시만 기다려 주세요.", 30000);
+    e.target.disabled = true; // 읽는 동안 두 번 올리지 않게
     try {
       const r = await api("POST", "/chat", {
         text: "이 사진은 제 보유 종목 목록입니다. 종목명과 수량 또는 비중(%)을 읽어서 set_holding 으로 전부 등록해 주세요. 수량이 없고 비중만 적혀 있으면 weight_pct 에 그 값을 넣으세요. 등록한 내용을 한 줄로만 알려주세요.",
         image: { mimeType: img.mimeType, data: img.data },
         keep_log: false,
       });
-      toast(r.reply ? r.reply.replace(/[#*|]/g, "").slice(0, 90) : "등록했습니다.", 7000);
+      toast(r.reply ? r.reply.replace(/[#*|]/g, "").slice(0, 90) : "등록했습니다.", 12000);
       loadAssets();
-    } catch (ex) { toast(ex.message); }
+    } catch (ex) { toast(ex.message); } finally { e.target.disabled = false; }
   });
   $("#balance-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const n = Number($("#balance-input").value.replace(/[^\d]/g, ""));
     if (!n) return toast("금액을 숫자로 넣어주세요.");
-    await api("PATCH", "/me", { total_balance: n }); toast("적립금을 저장했습니다."); loadAssets();
+    try { await api("PATCH", "/me", { total_balance: n }); toast("적립금을 저장했습니다."); loadAssets(); } catch (ex) { toast(ex.message); }
   });
   $("#balance-input").addEventListener("input", (e) => { const n = e.target.value.replace(/[^\d]/g, ""); e.target.value = n ? Number(n).toLocaleString("ko-KR") : ""; });
   document.addEventListener("click", async (e) => {
@@ -354,7 +361,7 @@
     // 시장 일정: 연준·한은·미국 노동통계국 공식 일정 (읽기 전용, 알림 없음)
     $("#market-list").innerHTML = market.length ? market.map((m) => `<div class="item"><div class="item-main"><div class="item-title">${esc(m.title)}</div><div class="item-sub">${dayLabel(m.date + " " + (m.time || "")).trim()}${m.time ? "" : " · 시각 미정"} · <a href="${esc(m.source)}" target="_blank" rel="noopener noreferrer">출처</a></div></div></div>`).join("")
       : `<div class="empty-row">앞으로 60일 안에 잡힌 시장 일정이 없습니다.</div>`;
-    $("#events-list").innerHTML = upcoming.length ? upcoming.map((e) => `<div class="item"><div class="item-main"><div class="item-title">${esc(e.title)}</div><div class="item-sub">${dayLabel(e.at)}${e.repeat !== "none" ? ` · ${e.repeat === "weekly" ? "매주" : "매일"}` : ""} · ${e.remind_min ? e.remind_min + "분 전 알림" : "정각 알림"}</div></div>
+    $("#events-list").innerHTML = upcoming.length ? upcoming.map((e) => `<div class="item"><div class="item-main"><div class="item-title">${esc(e.title)}</div><div class="item-sub">${dayLabel(e.at)}${e.repeat !== "none" ? ` · ${e.repeat === "weekly" ? "매주" : "매일"}` : ""} · ${!e.remind_min ? "정각 알림" : e.remind_min % 1440 === 0 ? e.remind_min / 1440 + "일 전 알림" : e.remind_min % 60 === 0 ? e.remind_min / 60 + "시간 전 알림" : e.remind_min + "분 전 알림"}</div></div>
       <button class="del" type="button" data-del-event="${e.id}" aria-label="${esc(e.title)} 삭제"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>`).join("")
       : `<div class="empty-row">앞으로 30일 안에 잡힌 일정이 없습니다. 아래에서 추가하거나 대화로 "토요일 3시 탁구"처럼 말씀하세요.</div>`;
     if (!$("#ev-date").value) $("#ev-date").value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -429,11 +436,16 @@
     busy(e.currentTarget, true);
     try { const r = await api("POST", "/push/test"); toast(r.sent.length ? "테스트 알림을 보냈습니다." : "먼저 알림을 켜주세요."); } catch (ex) { toast(ex.message); } finally { busy(e.currentTarget, false); }
   });
-  $("#clear-chat").addEventListener("click", async () => { if (!confirm("대화 기록을 모두 지울까요? 보유 종목·일정·기억은 남습니다.")) return; await api("DELETE", "/messages"); chatLoaded = false; toast("대화 기록을 지웠습니다."); });
+  $("#clear-chat").addEventListener("click", async () => { if (!confirm("대화 기록을 모두 지울까요? 보유 종목·일정·기억은 남습니다.")) return; try { await api("DELETE", "/messages"); chatLoaded = false; toast("대화 기록을 지웠습니다."); } catch (ex) { toast(ex.message); } });
   $("#logout").addEventListener("click", () => { if (confirm("이 기기에서 로그아웃할까요? 다시 들어올 때 코드와 비밀번호가 필요합니다.")) logout(); });
   window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferredInstall = e; $("#install-btn").hidden = false; });
   $("#install-btn").addEventListener("click", async () => { if (!deferredInstall) return; deferredInstall.prompt(); await deferredInstall.userChoice; deferredInstall = null; $("#install-btn").hidden = true; });
   function urlB64ToU8(s) { const b = atob((s + "=".repeat((4 - (s.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(b, (c) => c.charCodeAt(0)); }
+  // 앱을 다시 열면(백그라운드→화면) 그사이 도착한 브리핑·답이 보이게 대화를 다시 불러온다
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible" || !me || $("#view-chat").hidden) return;
+    watching.clear(); chatLoaded = false; loadChat().catch(() => {});
+  });
   function registerSW() { if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {}); }
 
   // ---------- 관리 ----------

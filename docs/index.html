@@ -31,7 +31,7 @@
       <form id="lock-form" autocomplete="off">
         <label class="field">
           <span>초대 코드</span>
-          <input id="lock-handle" type="text" inputmode="latin" autocapitalize="characters" maxlength="8" spellcheck="false" placeholder="예: ABC123" required>
+          <input id="lock-handle" type="text" inputmode="text" autocapitalize="characters" maxlength="8" spellcheck="false" placeholder="예: ABC123" required>
         </label>
         <label class="field">
           <span id="lock-pin-label">비밀번호 4자리</span>
@@ -105,7 +105,7 @@
           <label class="share-field" id="share-wrap" hidden>
             <span class="share-head"><span>등록한 ETF가 계좌에서 차지하는 비율</span><strong id="share-val">100%</strong></span>
             <input id="share-input" type="range" min="0" max="100" step="5" value="100" aria-describedby="share-hint">
-            <span class="muted small" id="share-hint">나머지는 예금·채권 등 안전자산으로 계산합니다.</span>
+            <span class="muted small" id="share-hint">증권사 앱의 퇴직연금 잔고 화면에서 ETF가 차지하는 비중을 보고 맞춰 주세요. 나머지는 예금·채권 등 안전자산으로 계산합니다.</span>
           </label>
           <form id="balance-form" class="inline-form">
             <label class="field grow">
