@@ -4,7 +4,7 @@ import { searchSymbol, getQuote } from "./quotes.js";
 import { sendPush } from "./push.js";
 import { getFinance, getKeyMetrics } from "./finance.js";
 import { analyzeStyle, riskProfile } from "./profile.js";
-import { buildBrief } from "./brief.js";
+import { buildBrief, NO_HOLDINGS_NOTE } from "./brief.js";
 
 const QUIET_FROM = 22, QUIET_TO = 7, DAILY_PUSH_CAP = 10, SESSION_DAYS = 30;
 
@@ -222,7 +222,9 @@ async function runMorningBrief(env, hour, now) {
     await env.DB.prepare("UPDATE users SET brief_last=? WHERE id=?").bind(today, u.id).run(); // 먼저 표시해 중복을 막는다
     try {
       const events = (await upcomingEvents(u.id, 1, env)).filter((e) => e.at.slice(0, 10) === today);
-      const ctx = (await deepContext(u, env)) + (events.length ? "\n오늘 일정:\n" + events.map((e) => `- ${e.at.slice(11)} ${e.title}`).join("\n") : "");
+      const hasHoldings = (await env.DB.prepare("SELECT 1 FROM holdings WHERE user_id=? LIMIT 1").bind(u.id).first());
+      const ctx = (await deepContext(u, env)) + (hasHoldings ? "" : "\n" + NO_HOLDINGS_NOTE)
+        + (events.length ? "\n오늘 일정:\n" + events.map((e) => `- ${e.at.slice(11)} ${e.title}`).join("\n") : "");
       await env.DB.prepare("INSERT INTO jobs (user_id, prompt, context, kind) VALUES (?,?,?,'brief')").bind(u.id, BRIEF_PROMPT, ctx).run();
     } catch (e) { /* 한 사람 실패가 다른 사람을 막지 않는다 */ }
   }
@@ -316,7 +318,7 @@ async function handleChat(user, body, env) {
   const mode = ["fast", "smart", "deep"].includes(body.mode) ? body.mode : "smart";
 
   // 깊게: LLM 을 거치지 않고 바로 로컬 PC 작업 대기줄로 넘긴다
-  if (mode === "deep" && text) {
+  if (mode === "deep" && text && !image) { // 사진은 집 PC로 못 넘기므로 기본으로 처리한다
     const ctxLines = await deepContext(user, env);
     const r = await env.DB.prepare("INSERT INTO jobs (user_id, prompt, context) VALUES (?,?,?)").bind(user.id, text, ctxLines || null).run();
     const reply = "깊이 알아보고 있습니다. 준비되면 알려드리겠습니다.";

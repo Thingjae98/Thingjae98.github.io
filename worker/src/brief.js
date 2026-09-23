@@ -2,6 +2,8 @@
 import { getQuote } from "./quotes.js";
 import { checkPension, etfShareLine } from "./pension.js";
 
+export const NO_HOLDINGS_NOTE = "보유 종목: 등록된 것 없음. 보유 종목 점검·안전자산·추천 칸은 빼고 시황과 앞으로 2주 일정만 쓴 뒤, 끝에 '자산 탭에서 보유 종목을 등록하시면 종목별 점검을 해드립니다.'를 한 줄 덧붙인다.";
+
 /** 사용자 한 명의 브리핑을 만든다. LLM 한 번만 쓴다. */
 export async function buildBrief(user, env, deps) {
   const { holdings, events } = deps;
@@ -16,7 +18,6 @@ export async function buildBrief(user, env, deps) {
       rows.push({ name: q.name, code: q.code, rate: q.changeRate, price: q.price, group: p.group });
     } catch { rows.push({ name: h.name, code: h.code }); }
   }
-  if (!rows.length && !events.length) return null;
 
   const holdingLines = rows.map((r) => `- ${r.name}${r.rate != null ? ` ${r.rate > 0 ? "+" : ""}${r.rate}% (${r.price?.toLocaleString()}원)` : ""}${pension && r.group ? ` [${r.group === "100" ? "안전자산" : "위험자산"}]` : ""}`);
   const eventLines = events.map((e) => `- ${e.at.slice(11)} ${e.title}`);
@@ -50,7 +51,7 @@ export async function buildBrief(user, env, deps) {
     "- 60대가 읽는다. 어려운 용어는 처음 나올 때 괄호로 푼다. 이모지는 쓰지 않는다.",
     "- 마크다운 소제목(##)과 글머리표를 쓰고 전체 1500자 안쪽.",
     "",
-    rows.length ? "보유 종목(어제 종가 기준 등락):\n" + holdingLines.join("\n") : "보유 종목: 등록된 것 없음",
+    rows.length ? "보유 종목(어제 종가 기준 등락):\n" + holdingLines.join("\n") : NO_HOLDINGS_NOTE,
     etfShareLine(user),
     eventLines.length ? "\n오늘 일정:\n" + eventLines.join("\n") : "",
   ].join("\n");

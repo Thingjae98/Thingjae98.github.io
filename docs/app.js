@@ -14,14 +14,18 @@
 
   // ---------- 공통 ----------
   async function api(method, path, body) {
-    const r = await fetch(API + path, {
-      method,
-      headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    let r;
+    try {
+      r = await fetch(API + path, {
+        method,
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    } catch { throw new Error("인터넷 연결을 확인해 주세요."); }
     const j = await r.json().catch(() => ({}));
     if (r.status === 401 && token) { logout(false); throw new Error(j.error || "다시 로그인해 주세요"); }
-    if (!r.ok) throw new Error(j.error || `오류 (${r.status})`);
+    if (r.status >= 500) throw new Error("잠시 문제가 생겼습니다. 조금 뒤 다시 해 주세요.");
+    if (!r.ok) throw new Error(j.error || `요청을 처리하지 못했습니다. (${r.status})`);
     return j;
   }
   const fmt = (n) => (n == null ? "-" : Number(n).toLocaleString("ko-KR"));
@@ -39,6 +43,7 @@
   let lockMode = "login";
   function showLock() {
     $("#app").hidden = true; $("#lock").hidden = false;
+    $("#lock-form").hidden = false; $("#lock-mode").hidden = false;
     const h = store.get("fa_handle"); if (h) $("#lock-handle").value = h;
     setLockMode(h ? "login" : "register");
     ($("#lock-handle").value ? $("#lock-pin") : $("#lock-handle")).focus();
@@ -216,10 +221,13 @@
     const img = attachment; attachment = null; $("#attach-preview").hidden = true;
     input.value = ""; input.style.height = "auto";
     addMsg("user", text || "(사진)", { thumb: img?.preview, time: new Date().toTimeString().slice(0, 5) });
-    const pending = addMsg("model", chatMode === "deep" ? "깊이 알아보는 중" : `${me.agent_name}가 생각 중`, { pending: true });
+    // 깊게(집 PC)는 사진을 받을 수 없으니 사진이 있으면 기본으로 읽는다
+    const mode = chatMode === "deep" && img ? "smart" : chatMode;
+    if (mode !== chatMode) toast("사진은 '기본'으로 읽어 드립니다.");
+    const pending = addMsg("model", mode === "deep" ? "깊이 알아보는 중" : `${me.agent_name}가 생각 중`, { pending: true });
     busy($("#chat-send"), true);
     try {
-      const r = await api("POST", "/chat", { text, mode: chatMode, image: img ? { mimeType: img.mimeType, data: img.data } : undefined });
+      const r = await api("POST", "/chat", { text, mode, image: img ? { mimeType: img.mimeType, data: img.data } : undefined });
       pending.remove();
       addMsg("model", r.reply, { time: new Date().toTimeString().slice(0, 5), document: r.document });
       if (r.job_id) watchJob(r.job_id);
@@ -493,7 +501,9 @@
     el.dataset.job = id;
     const started = Date.now();
     const tick = async () => {
-      if (Date.now() - started > 20 * 60 * 1000) {
+      if (!el.isConnected) return; // 대화를 다시 불러와 이 말풍선이 사라졌으면 새 감시가 이어받는다
+      // 서버가 30분 지난 작업을 실패로 정리하므로 그보다 조금 더 기다린다
+      if (Date.now() - started > 35 * 60 * 1000) {
         el.remove(); watching.delete(id);
         addMsg("model", "분석이 예상보다 오래 걸립니다. 잠시 후 대화를 새로 열어 확인해 주세요.");
         return;
@@ -501,15 +511,9 @@
       try {
         const { jobs } = await api("GET", "/jobs");
         const j = jobs.find((x) => x.id === id);
-        if (j?.status === "canceled") { // 늦어진 아침 브리핑은 서버가 대신 만들어 대화에 올렸다
-          el.remove(); watching.delete(id); chatLoaded = false; loadChat();
-          return;
-        }
-        if (j && (j.status === "done" || j.status === "failed")) {
-          el.remove(); watching.delete(id);
-          let doc = null;
-          if (j.document) { try { doc = JSON.parse(j.document); } catch {} }
-          addMsg("model", j.status === "done" ? j.result : `분석을 마치지 못했습니다. (${j.error || "원인 미상"})`, { time: new Date().toTimeString().slice(0, 5), document: doc });
+        // 끝났으면(완료·실패·브리핑 대체) 서버가 대화에 저장한 답을 그대로 다시 불러온다. 화면에서 따로 붙이면 두 번 보인다
+        if (j && ["done", "failed", "canceled"].includes(j.status)) {
+          el.remove(); watching.clear(); chatLoaded = false; loadChat();
           return;
         }
         if (j?.progress) el.querySelector(".dots").textContent = j.progress;
@@ -598,5 +602,15 @@
   // ---------- 시작 ----------
   buildNav();
   window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (me && VIEWS.some((v) => v.id === h)) go(h, false); });
-  if (token) enter().catch(() => showLock()); else showLock();
+  // 시작할 때 인터넷·서버 문제면 로그인 화면으로 보내지 않고 연결될 때까지 다시 시도한다 (로그인 만료는 api 가 로그인 화면으로 보낸다)
+  function startApp() {
+    enter().catch(() => {
+      if (!token) return;
+      $("#app").hidden = true; $("#lock").hidden = false;
+      $("#lock-form").hidden = true; $("#lock-mode").hidden = true;
+      $("#lock-sub").textContent = "인터넷 연결을 확인해 주세요. 연결되면 자동으로 들어갑니다.";
+      setTimeout(startApp, 5000);
+    });
+  }
+  if (token) startApp(); else showLock();
 })();
