@@ -1,5 +1,5 @@
 import { chat as geminiChat } from "./gemini.js";
-import { checkPension, riskRatio, pensionRuleText, searchEtf, etfShareLine } from "./pension.js";
+import { checkPension, riskRatio, pensionRuleText, searchEtf, etfShareLine, etfFee } from "./pension.js";
 import { searchSymbol, getQuote } from "./quotes.js";
 import { sendPush } from "./push.js";
 import { getFinance, getKeyMetrics } from "./finance.js";
@@ -59,7 +59,7 @@ async function holdingsWithPrices(user, env) {
     let price = h.avg_price;
     if (h.code) { try { price = await cachedPrice(h.code, env); } catch {} }
     const value = h.qty && price ? price * h.qty : (h.weight_pct && user.total_balance ? Math.round((h.weight_pct * f / 100) * user.total_balance) : null);
-    return { ...h, price, value };
+    return { ...h, price, value, fee_pct: etfFee(h.code) };
   }));
   const rr = riskRatio(priced, user.total_balance, null, user.etf_share_pct);
   return { holdings: priced, total_balance: user.total_balance, risk_value: rr.risk, risk_ratio_pct: rr.ratio, etf_share_pct: user.etf_share_pct };

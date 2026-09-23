@@ -68,6 +68,9 @@ export function riskRatio(holdings, totalBalance, add, etfShare = null) {
   return { risk: Math.round(risk), ratio: Math.round((risk / totalBalance) * 1000) / 10, ...(knownWeight ? { by_weight: true, ...kw } : {}) };
 }
 
+/** 판정표에 있는 ETF 총보수(연 %). 없으면 null */
+export const etfFee = (code) => (code && rules[code]?.fee) ?? null;
+
 /** 등록 비중이 ETF 부분 기준일 때 AI 에게 알려줄 한 줄 */
 export const etfShareLine = (u) => u.etf_share_pct == null ? "" :
   `등록한 종목 비중은 ETF 부분 안에서의 비중이다. 등록한 ETF는 계좌의 ${u.etf_share_pct}%이고, 나머지 ${100 - u.etf_share_pct}%는 예금·채권 등 안전자산이다. 위험자산 비중은 이것을 반영해 계산한다.`;

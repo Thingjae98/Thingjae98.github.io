@@ -117,6 +117,7 @@
       ["보유 현황", "내 보유 ETF 지금 어때?"],
       ["안전자산 확인", "내 위험자산 비중이 70% 한도 안에 있는지 확인해줘"],
       ["ETF 찾기", "퇴직연금으로 살 수 있는 채권혼합형 ETF 찾아줘"],
+      ["입금 배분", "이번에 100만 원을 입금할 예정인데, 위험자산 70% 한도 안에서 보유 ETF와 안전자산 중 어디에 얼마씩 나누면 좋을지 참고 의견 줘"],
       ["오늘 일정", "오늘 일정 알려줘"],
     ],
     general: [
@@ -292,7 +293,7 @@
     hl.innerHTML = d.holdings.length ? d.holdings.map((h) => {
       const pl = h.avg_price && h.price ? ((h.price - h.avg_price) / h.avg_price) * 100 : null;
       const share = h.weight_pct != null ? h.weight_pct + "%" : (totalValue && h.value ? ((h.value / totalValue) * 100).toFixed(1) + "%" : null);
-      const detail = [h.qty ? `${fmt(h.qty)}주` : null, h.avg_price ? `평단 ${fmt(h.avg_price)}원` : null, share ? `비중 ${share}` : null].filter(Boolean).join(" · ") || "수량 미입력";
+      const detail = [h.qty ? `${fmt(h.qty)}주` : null, h.avg_price ? `평단 ${fmt(h.avg_price)}원` : null, share ? `비중 ${share}` : null, h.fee_pct != null ? `총보수 ${h.fee_pct}%` : null].filter(Boolean).join(" · ") || "수량 미입력";
       return `<div class="item"><div class="item-main"><div class="item-title">${esc(h.name)}</div><div class="item-sub">${detail}</div></div>
         <div class="item-num">${h.value != null ? `<div>${fmt(h.value)}원</div>` : (h.price ? `<div class="item-sub">${fmt(h.price)}원</div>` : "")}${pl != null ? `<div class="item-sub ${pl >= 0 ? "up" : "down"}">${pl >= 0 ? "+" : ""}${pl.toFixed(1)}%</div>` : ""}</div>
         <button class="del" type="button" data-del-holding="${h.id}" aria-label="${esc(h.name)} 삭제"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>`;
