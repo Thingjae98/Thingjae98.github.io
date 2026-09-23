@@ -380,10 +380,9 @@
   });
   $("#brief-toggle").addEventListener("click", async () => {
     const on = $("#brief-toggle").getAttribute("aria-checked") !== "true";
-    if (on && !me.push_enabled) return toast("먼저 위의 일정 알림을 켜주세요. 알림 권한이 필요합니다.");
     try {
       me = await api("PATCH", "/me", { brief_enabled: on });
-      toast(on ? `매일 아침 ${$("#brief-hour").value}시에 보내드립니다.` : "아침 브리핑을 껐습니다.");
+      toast(on ? (me.push_enabled ? `매일 아침 ${$("#brief-hour").value}시에 보내드립니다.` : `매일 아침 ${$("#brief-hour").value}시에 대화창에 올려둡니다. 휴대폰 알림도 받으시려면 위의 일정 알림을 켜주세요.`) : "아침 브리핑을 껐습니다.", 6000);
     } catch (ex) { toast(ex.message); }
     loadSettings();
   });
@@ -480,7 +479,9 @@
         const j = jobs.find((x) => x.id === id);
         if (j && (j.status === "done" || j.status === "failed")) {
           el.remove(); watching.delete(id);
-          addMsg("model", j.status === "done" ? j.result : `분석을 마치지 못했습니다. (${j.error || "원인 미상"})`, { time: new Date().toTimeString().slice(0, 5) });
+          let doc = null;
+          if (j.document) { try { doc = JSON.parse(j.document); } catch {} }
+          addMsg("model", j.status === "done" ? j.result : `분석을 마치지 못했습니다. (${j.error || "원인 미상"})`, { time: new Date().toTimeString().slice(0, 5), document: doc });
           return;
         }
       } catch {}

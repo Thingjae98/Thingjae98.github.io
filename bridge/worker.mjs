@@ -8,7 +8,7 @@
  *   FA_API       서버 주소            기본 https://family-agent.mj98531.workers.dev
  *   FA_WORKER_KEY 작업자 열쇠          (서버 secret WORKER_KEY 와 같아야 함)
  *   FA_POLL_SEC  확인 주기(초)         기본 20
- *   FA_MAX_PER_DAY 하루 최대 처리 건수  기본 20 (과도한 사용을 막는 안전장치)
+ *   FA_MAX_PER_DAY 하루 최대 처리 건수  기본 100 (오류로 폭주하는 것을 막는 안전장치, 한국시간 자정에 초기화)
  */
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -26,7 +26,7 @@ try {
 const API = process.env.FA_API || "https://family-agent.mj98531.workers.dev";
 const KEY = process.env.FA_WORKER_KEY;
 const POLL = Number(process.env.FA_POLL_SEC || 20) * 1000;
-const MAX_PER_DAY = Number(process.env.FA_MAX_PER_DAY || 20);
+const MAX_PER_DAY = Number(process.env.FA_MAX_PER_DAY || 100);
 const TIMEOUT_MS = 10 * 60 * 1000;
 
 if (!KEY) { console.error("FA_WORKER_KEY 가 없습니다. bridge/.env 에 넣어주세요."); process.exit(1); }
@@ -86,6 +86,9 @@ function buildPrompt(job) {
     "- 읽는 사람은 60대다. 어려운 용어는 처음 나올 때 괄호로 풀어 쓴다.",
     "- 마크다운 표를 적극 쓰고, 전체 1500자 안쪽으로 정리한다.",
     "- 세금·규정 이야기에는 '최종 확인은 증권사나 세무사에게' 를 덧붙인다.",
+    "- 요청이 보고서·문서·PDF·발표자료·PPT 를 원할 때만: 본문은 5줄 안쪽 요약으로 쓰고, 답 맨 끝에 ```document 로 시작하는 코드블록 하나에 JSON 을 넣는다.",
+    '  형식: {"format":"pdf 또는 pptx(발표자료·PPT면 pptx)","title":"30자 이내","subtitle":"작성일·출처 한 줄","sections":[{"heading":"30자 이내","bullets":["60자 이내 3~5개"],"table":{"headers":["열 4개 이내"],"rows":[["행 6개 이내"]]},"note":"출처나 주의 한 줄"}]}',
+    "  sections 는 4~8개, table·note 는 필요할 때만 넣는다. 화면이 이 JSON 으로 실제 파일을 만든다.",
     "",
     "요청:",
     job.prompt,
@@ -97,7 +100,7 @@ async function loop() {
   log(`브릿지 시작. 서버 ${API}, ${POLL / 1000}초마다 확인, 하루 최대 ${MAX_PER_DAY}건`);
   for (;;) {
     try {
-      const d = new Date().toISOString().slice(0, 10);
+      const d = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10); // 한국시간 날짜
       if (d !== today) { today = d; doneToday = 0; }
       if (doneToday >= MAX_PER_DAY) { log(`하루 상한 ${MAX_PER_DAY}건에 도달. 내일 다시 처리합니다.`); await sleep(60 * 60 * 1000); continue; }
 

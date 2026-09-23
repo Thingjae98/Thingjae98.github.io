@@ -199,15 +199,14 @@ async function buildSystem(user, env) {
   ].join("\n");
 }
 
-// 아침 브리핑: 켠 사람에게 하루 1회, 설정한 시각(한국시간)에
+// 아침 브리핑: 켠 사람에게 하루 1회, 설정한 시각(한국시간)에. 알림이 꺼져 있으면 대화창에만 올린다
 async function runMorningBrief(env, hour, now) {
   const today = now.slice(0, 10);
-  const users = (await env.DB.prepare("SELECT * FROM users WHERE brief_enabled=1 AND push_enabled=1 AND brief_hour=? AND (brief_last IS NULL OR brief_last<>?)").bind(hour, today).all()).results;
+  const users = (await env.DB.prepare("SELECT * FROM users WHERE brief_enabled=1 AND brief_hour=? AND (brief_last IS NULL OR brief_last<>?)").bind(hour, today).all()).results;
   for (const u of users) {
     await env.DB.prepare("UPDATE users SET brief_last=? WHERE id=?").bind(today, u.id).run(); // 먼저 표시해 중복 발송을 막는다
     try {
-      const subs = (await env.DB.prepare("SELECT * FROM push_subs WHERE user_id=?").bind(u.id).all()).results;
-      if (!subs.length) continue;
+      const subs = u.push_enabled ? (await env.DB.prepare("SELECT * FROM push_subs WHERE user_id=?").bind(u.id).all()).results : [];
       const holdings = (await env.DB.prepare("SELECT code, name, qty FROM holdings WHERE user_id=?").bind(u.id).all()).results;
       const events = (await upcomingEvents(u.id, 1, env)).filter((e) => e.at.slice(0, 10) === today);
       const brief = await buildBrief(u, env, { holdings, events });
@@ -218,7 +217,7 @@ async function runMorningBrief(env, hour, now) {
       }
       await env.DB.batch([
         env.DB.prepare("INSERT INTO messages (user_id, role, content, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(u.id, "model", brief.text),
-        env.DB.prepare("INSERT INTO push_log (user_id, title, sent_at) VALUES (?,?,datetime('now','+9 hours'))").bind(u.id, "아침 브리핑"),
+        ...(subs.length ? [env.DB.prepare("INSERT INTO push_log (user_id, title, sent_at) VALUES (?,?,datetime('now','+9 hours'))").bind(u.id, "아침 브리핑")] : []),
         env.DB.prepare("INSERT INTO usage_log (user_id, in_tokens, out_tokens, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(u.id, brief.usage.in, brief.usage.out),
       ]);
     } catch (e) { /* 한 사람 실패가 다른 사람을 막지 않는다 */ }
@@ -332,10 +331,19 @@ export default {
           const { job_id, result, error } = body;
           const job = await env.DB.prepare("SELECT * FROM jobs WHERE id=?").bind(job_id).first();
           if (!job) return json({ error: "없는 작업" }, 404, origin);
-          await env.DB.prepare("UPDATE jobs SET status=?, result=?, error=?, finished_at=datetime('now','+9 hours') WHERE id=?")
-            .bind(error ? "failed" : "done", result ?? null, error ?? null, job_id).run();
-          const text = error ? `요청하신 분석을 마치지 못했습니다. (${String(error).slice(0, 200)})` : result;
-          await env.DB.prepare("INSERT INTO messages (user_id, role, content, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(job.user_id, "model", text).run();
+          // 답 끝의 ```document {...}``` 블록을 떼어 문서로 저장한다
+          let clean = result ?? null, doc = null;
+          const dm = typeof result === "string" && result.match(/```document\s*([\s\S]*?)```\s*$/);
+          if (dm) {
+            try {
+              const d = JSON.parse(dm[1]);
+              if (d && d.title && Array.isArray(d.sections)) { doc = JSON.stringify({ ...d, format: d.format === "pptx" ? "pptx" : "pdf" }); clean = result.slice(0, dm.index).trim(); }
+            } catch {}
+          }
+          await env.DB.prepare("UPDATE jobs SET status=?, result=?, error=?, document=?, finished_at=datetime('now','+9 hours') WHERE id=?")
+            .bind(error ? "failed" : "done", clean, error ?? null, doc, job_id).run();
+          const text = error ? `요청하신 분석을 마치지 못했습니다. (${String(error).slice(0, 200)})` : clean;
+          await env.DB.prepare("INSERT INTO messages (user_id, role, content, document, created_at) VALUES (?,?,?,?,datetime('now','+9 hours'))").bind(job.user_id, "model", text, doc).run();
           const subs = (await env.DB.prepare("SELECT * FROM push_subs WHERE user_id=?").bind(job.user_id).all()).results;
           const u = await env.DB.prepare("SELECT agent_name, push_enabled FROM users WHERE id=?").bind(job.user_id).first();
           const hour = kst().getUTCHours();
@@ -444,7 +452,7 @@ export default {
 
       // ---------- 작업 대기줄 (사용자) ----------
       if (p === "/jobs" && req.method === "GET") {
-        const rows = (await db.prepare("SELECT id, prompt, status, result, error, created_at, finished_at FROM jobs WHERE user_id=? ORDER BY id DESC LIMIT 20").bind(user.id).all()).results;
+        const rows = (await db.prepare("SELECT id, prompt, status, result, error, document, created_at, finished_at FROM jobs WHERE user_id=? ORDER BY id DESC LIMIT 20").bind(user.id).all()).results;
         return json({ jobs: rows }, 200, origin);
       }
 
