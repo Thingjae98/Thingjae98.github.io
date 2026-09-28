@@ -61,6 +61,7 @@ export async function chat({ system, history, userParts, runTool, env, model: ov
   const contents = [...history, { role: "user", parts: userParts }];
   const usage = { in: 0, out: 0 };
   const calls = [];
+  const sources = []; // 구글 검색으로 참고한 기사 {title, uri}
   for (let i = 0; i < 6; i++) {
     const r = await fetch(`${API}/${model}:generateContent?key=${env.GEMINI_API_KEY}`, {
       method: "POST",
@@ -77,10 +78,11 @@ export async function chat({ system, history, userParts, runTool, env, model: ov
     if (!r.ok) throw new Error(`Gemini ${r.status}: ${j.error?.message || ""}`);
     usage.in += j.usageMetadata?.promptTokenCount || 0;
     usage.out += j.usageMetadata?.candidatesTokenCount || 0;
+    for (const g of j.candidates?.[0]?.groundingMetadata?.groundingChunks || []) if (g.web?.uri) sources.push({ title: g.web.title || "출처", uri: g.web.uri });
     const parts = j.candidates?.[0]?.content?.parts || [];
     const fcalls = parts.filter((p) => p.functionCall);
     if (!fcalls.length) {
-      return { text: parts.map((p) => p.text || "").join("").trim() || "(답변을 만들지 못했습니다)", usage, calls };
+      return { text: parts.map((p) => p.text || "").join("").trim() || "(답변을 만들지 못했습니다)", usage, calls, sources };
     }
     contents.push({ role: "model", parts });
     const responses = [];

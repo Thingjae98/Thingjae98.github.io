@@ -192,7 +192,7 @@ async function buildSystem(user, env) {
     "- 주문을 실행하거나 실행한 척하지 않는다. 매매는 사용자가 증권사 앱에서 직접 한다.",
     "- 보유 종목이나 입금 배분을 물으면 '유지 / 비중 확대 / 비중 축소' 참고 의견과 편입 비중(예: 5%)을 제안해도 된다. 단 의견마다 근거(시세·규정·뉴스·본인 매매기록)를 붙이고, 퇴직연금이면 위험자산 70% 한도 안에서만 제안하며, '참고 의견이고 결정은 본인 몫'을 한 줄 덧붙인다. 근거가 없으면 의견을 내지 않는다.",
     "- ETF 구성종목을 물으면, 가진 자료에 구성종목이 없으니 '깊게' 모드로 물어보시면 운용사 자료에서 찾아드린다고 안내한다. 구성종목을 지어내지 않는다.",
-    "- 종목 이야기가 나오면 get_quote 로 현재가와 퇴직연금 투자가능 여부를 확인하고, 판정 근거(어느 표·어느 규정)를 한 줄 붙인다. 불가 종목이면 먼저 알린다.",
+    "- 종목 이야기가 나오면 get_quote 로 현재가와 퇴직연금 투자가능 여부를 확인한다. 판정 근거(어느 표·어느 규정)와 '증권사 앱에서 최종 확인' 문구는 사용자가 살 수 있는지·한도를 물었을 때나 살 수 없는 종목일 때만 한 번 붙인다. 이미 보유한 종목의 시세·등락만 물으면 붙이지 않는다. 규정 이름은 받은 판정 근거에 적힌 그대로 쓰고 바꾸거나 합치지 않는다.",
     "- 규정·세금 답변에는 '최종 확인은 증권사 앱/세무사' 문구를 붙인다. 모르면 모른다고 한다. 숫자를 지어내지 않는다.",
     "- 사용자가 매수·매도했다고 말하면 add_trade 로 기록하고, 이유·목표가·손절선을 한 번만 가볍게 묻는다(강요하지 않는다). 보유 수량도 set_holding 으로 맞춘다.",
     "- 사용자가 투자 원칙·선호·관심사를 말하면 save_memory 로 저장한다.",
@@ -244,7 +244,7 @@ async function runMorningBrief(env, hour, now) {
       const brief = await buildBrief(u, env, { holdings, events });
       if (!brief) continue;
       await deliverBrief(u, brief.text, brief.short, env);
-      await env.DB.prepare("INSERT INTO usage_log (user_id, in_tokens, out_tokens, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(u.id, brief.usage.in, brief.usage.out).run();
+      await env.DB.prepare("INSERT INTO usage_log (user_id, in_tokens, out_tokens, mode, created_at) VALUES (?,?,?,'brief',datetime('now','+9 hours'))").bind(u.id, brief.usage.in, brief.usage.out).run();
     } catch (e) { /* 한 사람 실패가 다른 사람을 막지 않는다 */ }
   }
 }
@@ -280,7 +280,7 @@ async function deliverBrief(u, text, short, env) {
   if (subs.length) await env.DB.prepare("INSERT INTO push_log (user_id, title, sent_at) VALUES (?,?,datetime('now','+9 hours'))").bind(u.id, "아침 브리핑").run();
 }
 
-const pub = (u) => ({ id: u.id, handle: u.handle, name: u.name, agent_name: u.agent_name, honorific: u.honorific, tone: u.tone, push_enabled: !!u.push_enabled, total_balance: u.total_balance, is_admin: !!u.is_admin, account_type: u.account_type || 'pension', brief_enabled: !!u.brief_enabled, brief_hour: u.brief_hour ?? 8 });
+const pub = (u) => ({ id: u.id, handle: u.handle, name: u.name, agent_name: u.agent_name, honorific: u.honorific, tone: u.tone, push_enabled: !!u.push_enabled, total_balance: u.total_balance, is_admin: !!u.is_admin, account_type: u.account_type || 'pension', brief_enabled: !!u.brief_enabled, brief_hour: u.brief_hour ?? 8, chat_mode: u.chat_mode || 'smart' });
 
 async function newSession(u, env) {
   const token = hex(crypto.getRandomValues(new Uint8Array(32)));
@@ -340,7 +340,11 @@ async function handleChat(user, body, env) {
   const system = await buildSystem(user, env);
   const ctx = {};
   const r = await geminiChat({ system, history: hist, userParts, runTool: makeToolRunner(user, env, ctx), env, model: mode === "fast" ? (env.GEMINI_MODEL_FAST || "gemini-3.5-flash-lite") : undefined });
-  const stmts = [env.DB.prepare("INSERT INTO usage_log (user_id, in_tokens, out_tokens, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(user.id, r.usage.in, r.usage.out)];
+  // 구글 검색을 썼으면 참고한 기사 2개를 답 끝에 붙인다 (답에 이미 출처가 있으면 그대로)
+  const seen = new Set();
+  const src = (r.sources || []).filter((s) => !seen.has(s.title) && seen.add(s.title)).slice(0, 2);
+  if (src.length && !/출처/.test(r.text)) r.text += "\n\n출처: " + src.map((s) => `[${s.title}](${s.uri})`).join(" · ");
+  const stmts = [env.DB.prepare("INSERT INTO usage_log (user_id, in_tokens, out_tokens, mode, created_at) VALUES (?,?,?,?,datetime('now','+9 hours'))").bind(user.id, r.usage.in, r.usage.out, mode)];
   if (body.keep_log !== false) {
     stmts.unshift(
       env.DB.prepare("INSERT INTO messages (user_id, role, content, has_image, created_at) VALUES (?,?,?,?,datetime('now','+9 hours'))").bind(user.id, "user", text || "(이미지)", image ? 1 : 0),
@@ -454,8 +458,9 @@ export default {
 
       if (p === "/me" && req.method === "GET") return json(pub(user), 200, origin);
       if (p === "/me" && req.method === "PATCH") {
+        if ("chat_mode" in body && !["fast", "smart", "deep"].includes(body.chat_mode)) body.chat_mode = "smart";
         if ("etf_share_pct" in body && body.etf_share_pct != null) body.etf_share_pct = Math.min(100, Math.max(0, Number(body.etf_share_pct) || 0));
-        const allowed = ["agent_name", "honorific", "tone", "push_enabled", "total_balance", "name", "brief_enabled", "brief_hour", "etf_share_pct"];
+        const allowed = ["agent_name", "honorific", "tone", "push_enabled", "total_balance", "name", "brief_enabled", "brief_hour", "etf_share_pct", "chat_mode"];
         const sets = [], vals = [];
         for (const k of allowed) if (k in body) { sets.push(`${k}=?`); vals.push(k === "push_enabled" || k === "brief_enabled" ? (body[k] ? 1 : 0) : body[k]); }
         if (sets.length) await db.prepare(`UPDATE users SET ${sets.join(",")} WHERE id=?`).bind(...vals, user.id).run();
@@ -528,7 +533,7 @@ export default {
         }
         if (p === "/admin/usage" && req.method === "GET") {
           const byUser = (await db.prepare(
-            `SELECT u.name, COUNT(l.id) AS calls, COALESCE(SUM(l.in_tokens),0) AS in_tok, COALESCE(SUM(l.out_tokens),0) AS out_tok
+            `SELECT u.id, u.name, COUNT(l.id) AS calls, COALESCE(SUM(l.in_tokens),0) AS in_tok, COALESCE(SUM(l.out_tokens),0) AS out_tok
              FROM users u LEFT JOIN usage_log l ON l.user_id=u.id GROUP BY u.id ORDER BY in_tok DESC`).all()).results;
           const byDay = (await db.prepare(
             `SELECT date(created_at) AS d, COUNT(*) AS calls, SUM(in_tokens) AS in_tok, SUM(out_tokens) AS out_tok
@@ -536,7 +541,11 @@ export default {
           const month = await db.prepare(
             `SELECT COUNT(*) AS calls, COALESCE(SUM(in_tokens),0) AS in_tok, COALESCE(SUM(out_tokens),0) AS out_tok
              FROM usage_log WHERE created_at >= date('now','+9 hours','start of month')`).first();
-          return json({ by_user: byUser, by_day: byDay, month, price: { in_per_mtok_usd: 0.75, out_per_mtok_usd: 3.75, model: env.GEMINI_MODEL } }, 200, origin);
+          // 이번 달 사용자별 답변 방식: Gemini 호출(빠르게·기본·브리핑) + 깊게(집 PC 작업)
+          const byMode = (await db.prepare(
+            `SELECT user_id, COALESCE(mode,'기록 전') AS mode, COUNT(*) AS n FROM usage_log WHERE created_at >= date('now','+9 hours','start of month') GROUP BY user_id, mode
+             UNION ALL SELECT user_id, 'deep', COUNT(*) FROM jobs WHERE kind IS NULL AND created_at >= date('now','+9 hours','start of month') GROUP BY user_id`).all()).results;
+          return json({ by_user: byUser, by_day: byDay, by_mode: byMode, month, price: { in_per_mtok_usd: 0.75, out_per_mtok_usd: 3.75, model: env.GEMINI_MODEL } }, 200, origin);
         }
         return json({ error: "not found" }, 404, origin);
       }

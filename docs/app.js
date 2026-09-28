@@ -137,6 +137,7 @@
     $("#side-agent").textContent = me.agent_name;
     $("#side-user").textContent = `${me.name}${me.honorific}`;
     document.title = me.agent_name;
+    chatMode = me.chat_mode || "smart"; applyMode();
   }
 
   // ---------- 대화 ----------
@@ -213,7 +214,7 @@
     smart: "Gemini Flash",
     deep: "Claude Opus",
   };
-  let chatMode = store.get("fa_mode") || "smart";
+  let chatMode = "smart"; // 계정에 저장된 방식(me.chat_mode)으로 들어올 때 바뀐다
   function applyMode() {
     document.querySelectorAll(".mode").forEach((b) => b.setAttribute("aria-checked", b.dataset.mode === chatMode ? "true" : "false"));
     $("#mode-hint").textContent = MODE_HINT[chatMode];
@@ -232,7 +233,9 @@
     const log = $("#chat-log"); log.scrollTop = log.scrollHeight; // 칸 높이가 바뀌어도 최근 대화가 보이게
   });
   document.querySelectorAll(".mode").forEach((b) => b.addEventListener("click", () => {
-    chatMode = b.dataset.mode; store.set("fa_mode", chatMode); applyMode();
+    chatMode = b.dataset.mode; applyMode();
+    // 답변 방식은 기기가 아니라 계정에 저장한다 (다른 기기에서도 같게, 관리자가 바꿔줄 수도 있게)
+    api("PATCH", "/me", { chat_mode: chatMode }).then((m) => { me = m; }).catch((ex) => toast(ex.message));
   }));
   applyMode();
 
@@ -503,8 +506,11 @@
     const won = (t) => Math.round(((t.in_tok / 1e6) * d.price.in_per_mtok_usd + (t.out_tok / 1e6) * d.price.out_per_mtok_usd) * 1400);
     $("#usage-cost").textContent = `약 ${fmt(won(d.month))}원 · 대화 ${fmt(d.month.calls)}회`;
     const rows = d.by_user.filter((u) => u.calls > 0);
+    // 이번 달 답변 방식별 횟수 (예: 기본 12 · 깊게 3 · 브리핑 5)
+    const MODE_NAME = { fast: "빠르게", smart: "기본", deep: "깊게", brief: "브리핑" };
+    const modesOf = (id) => (d.by_mode || []).filter((m) => m.user_id === id && m.n).map((m) => `${MODE_NAME[m.mode] || m.mode} ${fmt(m.n)}`).join(" · ");
     $("#usage-body").innerHTML = rows.length
-      ? `<div class="list">${rows.map((u) => `<div class="item"><div class="item-main"><div class="item-title">${esc(u.name)}</div><div class="item-sub">대화 ${fmt(u.calls)}회</div></div><div class="item-num">약 ${fmt(won(u))}원</div></div>`).join("")}</div>
+      ? `<div class="list">${rows.map((u) => `<div class="item"><div class="item-main"><div class="item-title">${esc(u.name)}</div><div class="item-sub">대화 ${fmt(u.calls)}회${modesOf(u.id) ? ` · 이번 달 ${esc(modesOf(u.id))}` : ""}</div></div><div class="item-num">약 ${fmt(won(u))}원</div></div>`).join("")}</div>
          <p class="hint">누적 기준입니다. 요금은 ${d.price.model} 기준으로 환산했고 실제 청구액은 구글 콘솔에서 확인하세요.</p>`
       : `<p class="empty-row">아직 사용 기록이 없습니다.</p>`;
   }

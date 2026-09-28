@@ -8,9 +8,9 @@ const FOOTER = "최종 확인은 증권사 앱의 '퇴직연금 투자가능' �
 function byName(name) {
   const n = name.replace(/\s/g, "");
   if (/레버리지|인버스|2X|3X|곱버스/i.test(n))
-    return { verdict: "불가", group: "0", basis: "레버리지·인버스 ETF는 퇴직연금 계좌에서 매수 불가(감독규정 §9①2호 마목)" };
+    return { verdict: "불가", group: "0", basis: "레버리지·인버스 ETF는 퇴직연금 계좌에서 매수 불가(퇴직연금감독규정 §9①2호 마목)" };
   if (/선물/.test(n) && /골드|금|은|원유|WTI|구리|천연가스|농산물|달러|엔|유로|통화/.test(n))
-    return { verdict: "불가", group: "0", basis: "원자재·통화 선물 ETF는 파생상품 위험평가액 40% 초과로 불가(감독규정 §9①2호 마목)" };
+    return { verdict: "불가", group: "0", basis: "원자재·통화 선물 ETF는 파생상품 위험평가액 40% 초과로 불가(퇴직연금감독규정 §9①2호 마목)" };
   return null;
 }
 
@@ -24,9 +24,9 @@ export function checkPension({ code, name, kind, accountType = "pension" }) {
   }
   // kind: 네이버 stockEndType (stock | etf | etn | reits ...)
   if (kind === "stock" && /리츠|인프라|REIT/i.test(name || ""))
-    return { verdict: "가능", group: "70", basis: "국내상장 리츠·인프라펀드는 개별주식 금지의 예외로 가능하되 위험자산이라 70% 한도에 포함(시행규칙 §10②)", footer: FOOTER };
+    return { verdict: "가능", group: "70", basis: "국내상장 리츠·인프라펀드는 개별주식 금지의 예외로 가능하되 위험자산이라 70% 한도에 포함(근로자퇴직급여보장법 시행규칙 §10②)", footer: FOOTER };
   if (kind === "stock")
-    return { verdict: "불가", group: "0", basis: "개별 주식은 퇴직연금 계좌에서 직접 매수 불가(시행규칙 §10②, 감독규정 §11②1호). 국내상장 리츠·인프라펀드는 예외", footer: FOOTER };
+    return { verdict: "불가", group: "0", basis: "개별 주식은 퇴직연금 계좌에서 직접 매수 불가(근로자퇴직급여보장법 시행규칙 §10②, 퇴직연금감독규정 §11②1호). 국내상장 리츠·인프라펀드는 예외", footer: FOOTER };
   const r = code && rules[code];
   if (r) {
     if (r.reti === "0") return { verdict: "불가", group: "0", basis: `${SOURCE_TABLE}에서 퇴직연금 편입 불가로 확인(레버리지·인버스·선물형)`, footer: FOOTER };
@@ -34,8 +34,8 @@ export function checkPension({ code, name, kind, accountType = "pension" }) {
     return {
       verdict: "가능", group: r.reti,
       basis: (r.reti === "100"
-        ? `안전자산으로 분류되어 한도 없이 담을 수 있음(감독규정 §11①). ${SOURCE_TABLE} 기준`
-        : `위험자산이라 다른 위험자산과 합쳐 전체 적립금의 70%까지만 가능(시행규칙 §10①2호). ${SOURCE_TABLE} 기준`) + est,
+        ? `안전자산으로 분류되어 한도 없이 담을 수 있음(퇴직연금감독규정 §11①). ${SOURCE_TABLE} 기준`
+        : `위험자산이라 다른 위험자산과 합쳐 전체 적립금의 70%까지만 가능(근로자퇴직급여보장법 시행규칙 §10①2호). ${SOURCE_TABLE} 기준`) + est,
       footer: FOOTER,
       estimated: !!r.est,
     };
