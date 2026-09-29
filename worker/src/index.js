@@ -186,8 +186,8 @@ async function upcomingEvents(userId, days, env) {
 // ---------- 시스템 프롬프트 ----------
 async function buildSystem(user, env) {
   const mem = (await env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY id DESC LIMIT 40").bind(user.id).all()).results.map((m) => "- " + m.content).join("\n");
-  const hold = (await env.DB.prepare("SELECT name, code, qty, avg_price FROM holdings WHERE user_id=?").bind(user.id).all()).results
-    .map((h) => `- ${h.name}(${h.code || "코드없음"}) ${h.qty}주${h.avg_price ? ", 평단 " + h.avg_price.toLocaleString() + "원" : ""}`).join("\n");
+  const hold = (await env.DB.prepare("SELECT name, code, qty, avg_price, weight_pct FROM holdings WHERE user_id=?").bind(user.id).all()).results
+    .map((h) => `- ${h.name}(${h.code || "코드없음"}) ${h.qty ? h.qty + "주" : "수량 모름"}${h.weight_pct != null ? `, 비중 ${h.weight_pct}%` : ""}${h.avg_price ? ", 평단 " + h.avg_price.toLocaleString() + "원" : ""}`).join("\n");
   return [
     `당신의 이름은 '${user.agent_name}'. ${user.name}${user.honorific}의 개인 비서다. 지금은 한국시간 ${kstStr()}.`,
     `말투: ${user.tone}. 사용자를 부를 때는 '${user.name}${user.honorific}'.`,
@@ -200,7 +200,11 @@ async function buildSystem(user, env) {
     "- ETF 구성종목을 물으면, 가진 자료에 구성종목이 없으니 '깊게' 모드로 물어보시면 운용사 자료에서 찾아드린다고 안내한다. 구성종목을 지어내지 않는다.",
     "- 종목 이야기가 나오면 get_quote 로 현재가와 퇴직연금 투자가능 여부를 확인한다. 판정 근거(어느 표·어느 규정)와 '증권사 앱에서 최종 확인' 문구는 사용자가 살 수 있는지·한도를 물었을 때나 살 수 없는 종목일 때만 한 번 붙인다. 이미 보유한 종목의 시세·등락만 물으면 붙이지 않는다. 규정 이름은 받은 판정 근거에 적힌 그대로 쓰고 바꾸거나 합치지 않는다.",
     "- 규정·세금 답변에는 '최종 확인은 증권사 앱/세무사' 문구를 붙인다. 모르면 모른다고 한다. 숫자를 지어내지 않는다.",
-    "- 사용자가 매수·매도했다고 말하면 add_trade 로 기록하고, 이유·목표가·손절선을 한 번만 가볍게 묻는다(강요하지 않는다). 보유 수량도 set_holding 으로 맞춘다.",
+    "- 사용자가 매수·매도했다고 말하면 add_trade 로 기록하고, 이유·목표가·손절선을 한 번만 가볍게 묻는다(강요하지 않는다). 보유 종목도 set_holding 으로 맞춘다:",
+    "  · 수량이 있는 종목: 남은 수량으로 바꾼다(매수는 더하고 매도는 뺀다). 다 팔았으면 qty 0 으로 지운다.",
+    "  · '수량 모름'(비중만 있는) 종목: 판 비율만큼 비중을 줄인다(절반이면 7% → 3.5%, 전부면 qty 0 으로 지운다). 새로 산 종목은 수량으로 등록한다.",
+    "  · 가격을 말하지 않았으면 되묻지 말고 get_quote 의 현재가로 add_trade 에 기록하고, 답에 '체결가를 몰라 현재가로 적었습니다. 다르면 알려주세요'를 한 줄 붙인다.",
+    "  · 수량을 모르면(예: '절반 팔았어') 적립금과 비중을 알면 수량을 계산해 기록하고 '계산한 수량'이라고 밝힌다. 계산할 수 없으면 매매일지는 건너뛰고 보유 비중만 바꾼 뒤, 수량을 알려주시면 일지에 적겠다고 한다.",
     "- 사용자가 투자 원칙·선호·관심사를 말하면 save_memory 로 저장한다.",
     "- 일정을 말하면 add_event 로 저장하고 알림 시각을 확인해 준다.",
     "- 보유 종목 전체가 담긴 잔고 캡처나 비중표를 받으면 set_holding 으로 등록하지 않는다(사진에 없는 옛 종목이 남는다). 대신 무엇이 보이는지 표로 정리해 주고, '자산 탭의 [보유 종목 사진으로 바꾸기]에 같은 사진을 올리시면 확인 후 전체가 한 번에 바뀝니다'라고 안내한다. 종목 한두 개를 말로 알려주면(예: 'SOL 반도체 100주 보유') 그것만 set_holding 으로 반영한다.",
@@ -338,8 +342,11 @@ async function deepContext(user, env) {
 // '자동' 방식: 원인·전망·분석·보고서 같은 무거운 질문만 집 PC(깊게)로, 인사·시세 확인·짧은 질문·사진은 기본(즉시)으로
 // (매수·매도 '했다'는 매매 기록은 기본 모드의 기록 도구가 처리해야 하므로 넣지 않는다)
 const DEEP_WORDS = /왜|이유|원인|전망|분석|비교|점검|리포트|보고서|발표|ppt|pdf|정리해|추천|어떻게 해야|배분|나누면|리밸런싱|앞으로|괜찮을까|사도 될|팔아야|이슈|체크해|의견/i;
+// '샀어·팔았어' 같은 매매 보고는 기록 도구가 있는 기본 모드에서 처리해야 보유 종목·매매일지에 반영된다
+const TRADE_WORDS = /샀어|샀다|샀습니다|샀는데|팔았|매수했|매도했|사뒀|매수함|매도함|정리했/;
 function autoMode(text, image) {
   if (image || !text) return "smart";
+  if (TRADE_WORDS.test(text)) return "smart";
   const t = text.replace(/\s+/g, " ").trim();
   if (t.length < 8 || /^(고마워|감사|좋아|좋은데|알겠|ㅎ|ㅋ|네|응|오케이|ok)/i.test(t)) return "smart";
   return DEEP_WORDS.test(t) ? "deep" : "smart";
@@ -349,7 +356,8 @@ async function handleChat(user, body, env) {
   const text = (body.text || "").trim();
   const image = body.image; // { mimeType, data(base64) }
   if (!text && !image) throw new Error("내용이 없습니다");
-  const mode = body.mode === "auto" ? autoMode(text, image) : ["fast", "smart", "deep"].includes(body.mode) ? body.mode : "smart";
+  let mode = body.mode === "auto" ? autoMode(text, image) : ["fast", "smart", "deep"].includes(body.mode) ? body.mode : "smart";
+  if (mode === "deep" && TRADE_WORDS.test(text)) mode = "smart"; // 깊게(집 PC)에는 기록 도구가 없다
 
   // 깊게: LLM 을 거치지 않고 바로 로컬 PC 작업 대기줄로 넘긴다
   if (mode === "deep" && text && !image) { // 사진은 집 PC로 못 넘기므로 기본으로 처리한다
