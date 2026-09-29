@@ -14,7 +14,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-  <link rel="stylesheet" href="styles.css?v=20260928a">
+  <link rel="stylesheet" href="styles.css?v=20260929a">
   <script src="config.js"></script>
 </head>
 <body>
@@ -71,6 +71,7 @@
         <div id="chat-tools" hidden>
         <div class="chips" id="chips"></div>
         <div class="mode-bar" role="radiogroup" aria-label="답변 방식">
+          <button type="button" class="mode" data-mode="auto" role="radio" aria-checked="false">자동</button>
           <button type="button" class="mode" data-mode="fast" role="radio" aria-checked="false">빠르게</button>
           <button type="button" class="mode" data-mode="smart" role="radio" aria-checked="true">기본</button>
           <button type="button" class="mode" data-mode="deep" role="radio" aria-checked="false">깊게</button>
@@ -173,6 +174,14 @@
 
       <!-- 관리 (관리자 전용) -->
       <section id="view-admin" class="view" data-view="admin" hidden>
+        <div class="panel">
+          <div class="panel-head"><h2>상태 점검</h2><button id="status-refresh" class="btn ghost small" type="button">다시 확인</button></div>
+          <div id="status-body" class="list"><div class="empty-row">확인 중…</div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>전망 적중률</h2><span class="muted small">관리자에게만 보입니다</span></div>
+          <div id="pred-body"></div>
+        </div>
         <div class="panel">
           <div class="panel-head"><h2>가족 추가</h2></div>
           <form id="invite-form" class="inline-form">
@@ -288,6 +297,6 @@
   </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
-  <script src="app.js?v=20260928a"></script>
+  <script src="app.js?v=20260929a"></script>
 </body>
 </html>

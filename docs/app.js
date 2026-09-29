@@ -210,6 +210,7 @@
     resumePendingJobs();
   }
   const MODE_HINT = {
+    auto: "Gemini Flash / Claude Opus (질문에 따라 자동)",
     fast: "Gemini Flash Lite",
     smart: "Gemini Flash",
     deep: "Claude Opus",
@@ -266,7 +267,7 @@
       const r = await api("POST", "/chat", { text, mode, image: img ? { mimeType: img.mimeType, data: img.data } : undefined });
       pending.remove();
       // 깊게로 넘긴 경우 "알아보고 있습니다" 안내는 진행 표시 말풍선 하나로만 보여준다
-      if (!(r.job_id && mode === "deep")) addMsg("model", r.reply, { time: new Date().toTimeString().slice(0, 5), document: r.document });
+      if (!(r.job_id && r.mode === "deep")) addMsg("model", r.reply, { time: new Date().toTimeString().slice(0, 5), document: r.document });
       if (r.job_id) watchJob(r.job_id);
     } catch (ex) {
       pending.remove();
@@ -483,7 +484,30 @@
 
   // ---------- 관리 ----------
   const ACCOUNT_LABEL = { pension: "퇴직연금 전용", general: "일반 계좌" };
+  // 상태 점검: 조용히 망가진 곳이 없는지 (브릿지·시세·오늘 브리핑·작업)
+  async function loadStatus() {
+    const row = (ok, title, sub) => `<div class="item"><div class="item-main"><div class="item-title">${ok === true ? "정상" : ok === false ? "확인 필요" : "참고"} · ${esc(title)}</div><div class="item-sub">${esc(sub)}</div></div><span class="badge ${ok === true ? "ok" : ok === false ? "no" : "warn"}">${ok === true ? "OK" : ok === false ? "!" : "-"}</span></div>`;
+    try {
+      const s = await api("GET", "/admin/status");
+      const ago = s.bridge_seconds_ago;
+      const BRIEF = { done: "Opus로 도착", canceled: "PC 응답 없어 Gemini로 대신 보냄", running: "만드는 중", queued: "대기 중", failed: "실패" };
+      $("#status-body").innerHTML = [
+        row(ago != null && ago < 120, "집 PC 브릿지", ago == null ? "응답 기록 없음" : ago < 120 ? `${ago}초 전 응답` : `${Math.round(ago / 60)}분째 응답 없음 (PC 꺼짐·절전·브릿지 멈춤). 깊게 질문은 30분 뒤 실패 안내, 브리핑은 Gemini가 대신합니다`),
+        row(s.quote.ok, "시세 조회", s.quote.ok ? `KODEX 200 ${fmt(s.quote.price)}원 · ${s.quote.ms}ms · 전 거래일 ${s.quote.prev_date}` : `실패: ${s.quote.error || ""}`),
+        ...s.briefs.map((b) => {
+          const before = Number(s.now.slice(11, 13)) < b.brief_hour;
+          return row(b.job_status === "done" ? true : b.job_status === "failed" ? false : before ? null : b.job_status === "canceled" ? null : false,
+            `${b.name} 아침 브리핑`, before && !b.job_status ? `${b.brief_hour}시에 만들 예정` : BRIEF[b.job_status] || "오늘 아직 없음");
+        }),
+        row(!(s.jobs.failed7 > 0), "깊게 작업", `대기·진행 ${s.jobs.waiting || 0}건 · 오늘 ${s.jobs.deep_today || 0}건 · 최근 7일 실패 ${s.jobs.failed7 || 0}건`),
+        row(s.etf_rules >= 1000, "ETF 판정표", `${fmt(s.etf_rules)}종 (매주 월 07시 이 PC가 자동 갱신)`),
+      ].join("");
+    } catch (ex) { $("#status-body").innerHTML = row(false, "상태 조회", ex.message); }
+  }
+  $("#status-refresh").addEventListener("click", loadStatus);
+
   async function loadAdmin() {
+    loadStatus();
     const { users } = await api("GET", "/admin/users");
     $("#admin-count").textContent = `${users.length}명`;
     $("#admin-users").innerHTML = users.map((u) => `
@@ -505,9 +529,20 @@
     const d = await api("GET", "/admin/usage");
     const won = (t) => Math.round(((t.in_tok / 1e6) * d.price.in_per_mtok_usd + (t.out_tok / 1e6) * d.price.out_per_mtok_usd) * 1400);
     $("#usage-cost").textContent = `약 ${fmt(won(d.month))}원 · 대화 ${fmt(d.month.calls)}회`;
+    // 전망 적중률 (관리자 전용. 브리핑·깊게 답의 전망을 14일 뒤 실제 수익률로 채점)
+    const pr = d.predictions, pct = (h, n) => (n ? `${Math.round((h / n) * 100)}% (${h}/${n})` : "-");
+    const VIEW = { up: "반등 우세", down: "하락 우세", flat: "횡보" }, CONF = { low: "낮음", mid: "보통", high: "높음" };
+    $("#pred-body").innerHTML = !pr ? "" : `
+      <p class="meter-text">전체 적중률 ${pct(pr.total.h || 0, pr.total.n)} · 채점 대기 ${fmt(pr.pending.n)}건${pr.pending.next ? ` (첫 채점 ${pr.pending.next})` : ""}</p>
+      <p class="hint">전망을 낸 날의 기준가와 ${pr.horizon_days}일 뒤 가격을 비교합니다. ±${pr.band_pct}% 안이면 횡보, 넘게 오르면 반등, 넘게 내리면 하락으로 봅니다.</p>
+      ${pr.total.n ? `<div class="list">
+        ${pr.by_view.map((v) => `<div class="item"><div class="item-main"><div class="item-title">${VIEW[v.k] || v.k}</div></div><div class="item-num">${pct(v.h || 0, v.n)}</div></div>`).join("")}
+        ${pr.by_confidence.map((v) => `<div class="item"><div class="item-main"><div class="item-title">확신도 ${CONF[v.k] || v.k}</div></div><div class="item-num">${pct(v.h || 0, v.n)}</div></div>`).join("")}
+      </div>
+      <div class="list" style="margin-top:12px">${pr.recent.map((p) => `<div class="item"><div class="item-main"><div class="item-title">${p.hit ? "적중" : "빗나감"} · ${esc(p.grp)}</div><div class="item-sub">${esc(p.name)} ${p.made_at.slice(5, 10)} · 전망 ${VIEW[p.view]}(${CONF[p.confidence] || "-"}) → 실제 ${p.ret > 0 ? "+" : ""}${p.ret}%</div></div></div>`).join("")}</div>` : ""}`;
     const rows = d.by_user.filter((u) => u.calls > 0);
     // 이번 달 답변 방식별 횟수 (예: 기본 12 · 깊게 3 · 브리핑 5)
-    const MODE_NAME = { fast: "빠르게", smart: "기본", deep: "깊게", brief: "브리핑" };
+    const MODE_NAME = { auto: "자동", fast: "빠르게", smart: "기본", deep: "깊게", brief: "브리핑" };
     const modesOf = (id) => (d.by_mode || []).filter((m) => m.user_id === id && m.n).map((m) => `${MODE_NAME[m.mode] || m.mode} ${fmt(m.n)}`).join(" · ");
     $("#usage-body").innerHTML = rows.length
       ? `<div class="list">${rows.map((u) => `<div class="item"><div class="item-main"><div class="item-title">${esc(u.name)}</div><div class="item-sub">대화 ${fmt(u.calls)}회${modesOf(u.id) ? ` · 이번 달 ${esc(modesOf(u.id))}` : ""}</div></div><div class="item-num">약 ${fmt(won(u))}원</div></div>`).join("")}</div>

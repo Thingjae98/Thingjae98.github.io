@@ -6,6 +6,7 @@ import { getFinance, getKeyMetrics } from "./finance.js";
 import { analyzeStyle, riskProfile } from "./profile.js";
 import { buildBrief, NO_HOLDINGS_NOTE } from "./brief.js";
 import { upcomingMarket, marketLines } from "./market_calendar.js";
+import { extractOutlook, savePredictions, scorePredictions, predictionStats } from "./predictions.js";
 
 const QUIET_FROM = 22, QUIET_TO = 7, DAILY_PUSH_CAP = 10, SESSION_DAYS = 30;
 
@@ -245,7 +246,9 @@ async function runMorningBrief(env, hour, now) {
       const events = (await upcomingEvents(u.id, 1, env)).filter((e) => e.at.slice(0, 10) === today);
       const brief = await buildBrief(u, env, { holdings, events });
       if (!brief) continue;
-      await deliverBrief(u, brief.text, brief.short, env);
+      const oc = extractOutlook(brief.text); // 기록용 전망 블록은 떼어 관리자 적중률로만
+      await deliverBrief(u, oc.text, brief.short, env);
+      if (oc.items.length) await savePredictions(env, u.id, "brief", oc.items).catch(() => {});
       await env.DB.prepare("INSERT INTO usage_log (user_id, in_tokens, out_tokens, mode, created_at) VALUES (?,?,?,'brief',datetime('now','+9 hours'))").bind(u.id, brief.usage.in, brief.usage.out).run();
     } catch (e) { /* 한 사람 실패가 다른 사람을 막지 않는다 */ }
   }
@@ -328,11 +331,21 @@ async function deepContext(user, env) {
   ].filter(Boolean).join("\n");
 }
 
+// '자동' 방식: 원인·전망·분석·보고서 같은 무거운 질문만 집 PC(깊게)로, 인사·시세 확인·짧은 질문·사진은 기본(즉시)으로
+// (매수·매도 '했다'는 매매 기록은 기본 모드의 기록 도구가 처리해야 하므로 넣지 않는다)
+const DEEP_WORDS = /왜|이유|원인|전망|분석|비교|점검|리포트|보고서|발표|ppt|pdf|정리해|추천|어떻게 해야|배분|나누면|리밸런싱|앞으로|괜찮을까|사도 될|팔아야|이슈|체크해|의견/i;
+function autoMode(text, image) {
+  if (image || !text) return "smart";
+  const t = text.replace(/\s+/g, " ").trim();
+  if (t.length < 8 || /^(고마워|감사|좋아|좋은데|알겠|ㅎ|ㅋ|네|응|오케이|ok)/i.test(t)) return "smart";
+  return DEEP_WORDS.test(t) ? "deep" : "smart";
+}
+
 async function handleChat(user, body, env) {
   const text = (body.text || "").trim();
   const image = body.image; // { mimeType, data(base64) }
   if (!text && !image) throw new Error("내용이 없습니다");
-  const mode = ["fast", "smart", "deep"].includes(body.mode) ? body.mode : "smart";
+  const mode = body.mode === "auto" ? autoMode(text, image) : ["fast", "smart", "deep"].includes(body.mode) ? body.mode : "smart";
 
   // 깊게: LLM 을 거치지 않고 바로 로컬 PC 작업 대기줄로 넘긴다
   if (mode === "deep" && text && !image) { // 사진은 집 PC로 못 넘기므로 기본으로 처리한다
@@ -343,7 +356,7 @@ async function handleChat(user, body, env) {
       env.DB.prepare("INSERT INTO messages (user_id, role, content, has_image, created_at) VALUES (?,?,?,?,datetime('now','+9 hours'))").bind(user.id, "user", text, 0),
       env.DB.prepare("INSERT INTO messages (user_id, role, content, created_at) VALUES (?,?,?,datetime('now','+9 hours'))").bind(user.id, "model", reply),
     ]);
-    return { reply, tools: [], document: null, job_id: r.meta.last_row_id };
+    return { reply, tools: [], document: null, job_id: r.meta.last_row_id, mode };
   }
   const hist = (await env.DB.prepare("SELECT role, content FROM messages WHERE user_id=? ORDER BY id DESC LIMIT 24").bind(user.id).all()).results.reverse()
     .map((m) => ({ role: m.role, parts: [{ text: m.content }] }));
@@ -365,7 +378,7 @@ async function handleChat(user, body, env) {
     );
   }
   await env.DB.batch(stmts);
-  return { reply: r.text, tools: r.calls, document: ctx.document || null, job_id: ctx.job_id || null };
+  return { reply: r.text, tools: r.calls, document: ctx.document || null, job_id: ctx.job_id || null, mode };
 }
 
 // ---------- 라우터 ----------
@@ -413,6 +426,8 @@ export default {
       if (p.startsWith("/worker/")) {
         if ((req.headers.get("X-Worker-Key") || "") !== env.WORKER_KEY) return json({ error: "작업자 인증 실패" }, 403, origin);
         if (p === "/worker/claim" && req.method === "POST") {
+          // 상태 점검용: 브릿지가 살아 있는지 (20초마다 확인하러 온다)
+          await env.DB.prepare("INSERT INTO kv (k, v, updated_at) VALUES ('bridge_seen', '', datetime('now','+9 hours')) ON CONFLICT(k) DO UPDATE SET updated_at=excluded.updated_at").run();
           const job = await env.DB.prepare("SELECT * FROM jobs WHERE status='queued' ORDER BY id LIMIT 1").first();
           if (!job) return json({ job: null }, 200, origin);
           const upd = await env.DB.prepare("UPDATE jobs SET status='running', claimed_at=datetime('now','+9 hours') WHERE id=? AND status='queued'").bind(job.id).run();
@@ -432,19 +447,22 @@ export default {
           if (!job) return json({ error: "없는 작업" }, 404, origin);
           if (job.status === "canceled") return json({ ok: true, ignored: true }, 200, origin); // 늦게 온 브리핑: 이미 Gemini 로 대신 보냄
           if (job.kind === "brief" && error) return json({ ok: true }, 200, origin); // 실행 중으로 두면 20분 뒤 Gemini 가 대신 만든다
+          // 전망 기록용 ```outlook``` 블록은 떼어 관리자 적중률로만 저장한다 (사용자에게 안 보인다)
+          const oc = extractOutlook(result);
           // 답 끝의 ```document {...}``` 블록을 떼어 문서로 저장한다
-          let clean = result ?? null, doc = null;
-          const dm = typeof result === "string" && result.match(/```document\s*([\s\S]*?)```\s*$/);
+          let clean = oc.text ?? null, doc = null;
+          const dm = typeof clean === "string" && clean.match(/```document\s*([\s\S]*?)```\s*$/);
           if (dm) {
             try {
               const d = JSON.parse(dm[1]);
-              if (d && d.title && Array.isArray(d.sections)) { doc = JSON.stringify({ ...d, format: d.format === "pptx" ? "pptx" : "pdf" }); clean = result.slice(0, dm.index).trim(); }
+              if (d && d.title && Array.isArray(d.sections)) { doc = JSON.stringify({ ...d, format: d.format === "pptx" ? "pptx" : "pdf" }); clean = clean.slice(0, dm.index).trim(); }
             } catch {}
           }
           // 브리핑은 크론이 막 취소한 것과 겹치면 무시한다 (Opus·Gemini 브리핑이 둘 다 가지 않게)
           const fin = await env.DB.prepare(`UPDATE jobs SET status=?, result=?, error=?, document=?, finished_at=datetime('now','+9 hours') WHERE id=?${job.kind === "brief" ? " AND status IN ('queued','running')" : ""}`)
             .bind(error ? "failed" : "done", clean, error ?? null, doc, job_id).run();
           if (!fin.meta.changes) return json({ ok: true, ignored: true }, 200, origin);
+          if (!error && oc.items.length) await savePredictions(env, job.user_id, job.kind === "brief" ? "brief" : "deep", oc.items).catch(() => {});
           const text = error ? `요청하신 분석을 마치지 못했습니다. (${String(error).slice(0, 200)})` : clean;
           if (job.kind === "brief") {
             const bu = await env.DB.prepare("SELECT * FROM users WHERE id=?").bind(job.user_id).first();
@@ -471,7 +489,7 @@ export default {
 
       if (p === "/me" && req.method === "GET") return json(pub(user), 200, origin);
       if (p === "/me" && req.method === "PATCH") {
-        if ("chat_mode" in body && !["fast", "smart", "deep"].includes(body.chat_mode)) body.chat_mode = "smart";
+        if ("chat_mode" in body && !["auto", "fast", "smart", "deep"].includes(body.chat_mode)) body.chat_mode = "smart";
         if ("etf_share_pct" in body && body.etf_share_pct != null) body.etf_share_pct = Math.min(100, Math.max(0, Number(body.etf_share_pct) || 0));
         const allowed = ["agent_name", "honorific", "tone", "push_enabled", "total_balance", "name", "brief_enabled", "brief_hour", "etf_share_pct", "chat_mode"];
         const sets = [], vals = [];
@@ -544,6 +562,24 @@ export default {
             return json({ ok: true }, 200, origin);
           }
         }
+        // 상태 점검: 조용히 망가진 곳이 없는지 한눈에 (누를 때 시세도 실제로 한 번 조회한다)
+        if (p === "/admin/status" && req.method === "GET") {
+          const today = kstStr().slice(0, 10);
+          const seen = await db.prepare("SELECT updated_at FROM kv WHERE k='bridge_seen'").first();
+          const bridgeAgo = seen ? Math.round((kst().getTime() - Date.parse(seen.updated_at.replace(" ", "T") + "Z")) / 1000) : null;
+          const t0 = Date.now(); let quote = null;
+          try { const q = await getQuote("069500", env); const pd = await prevDay("069500"); quote = { ok: !!q.price, ms: Date.now() - t0, price: q.price, market: q.marketStatus, prev_date: pd.date }; }
+          catch (e) { quote = { ok: false, ms: Date.now() - t0, error: String(e.message || e).slice(0, 120) }; }
+          const briefs = (await db.prepare(`SELECT u.name, u.brief_enabled, u.brief_hour, u.brief_last,
+              (SELECT status FROM jobs j WHERE j.user_id=u.id AND j.kind='brief' AND j.created_at >= ? ORDER BY j.id DESC LIMIT 1) AS job_status
+             FROM users u WHERE u.brief_enabled=1`).bind(today).all()).results;
+          const jobs = await db.prepare(`SELECT
+              SUM(status IN ('queued','running')) AS waiting,
+              SUM(status='failed' AND created_at >= datetime('now','+9 hours','-7 days')) AS failed7,
+              SUM(kind IS NULL AND created_at >= ?) AS deep_today
+             FROM jobs`).bind(today).first();
+          return json({ now: kstStr(), bridge_seconds_ago: bridgeAgo, quote, briefs, jobs, etf_rules: searchEtf({ limit: 1 }).total }, 200, origin);
+        }
         if (p === "/admin/usage" && req.method === "GET") {
           const byUser = (await db.prepare(
             `SELECT u.id, u.name, COUNT(l.id) AS calls, COALESCE(SUM(l.in_tokens),0) AS in_tok, COALESCE(SUM(l.out_tokens),0) AS out_tok
@@ -558,7 +594,8 @@ export default {
           const byMode = (await db.prepare(
             `SELECT user_id, COALESCE(mode,'기록 전') AS mode, COUNT(*) AS n FROM usage_log WHERE created_at >= date('now','+9 hours','start of month') GROUP BY user_id, mode
              UNION ALL SELECT user_id, 'deep', COUNT(*) FROM jobs WHERE kind IS NULL AND created_at >= date('now','+9 hours','start of month') GROUP BY user_id`).all()).results;
-          return json({ by_user: byUser, by_day: byDay, by_mode: byMode, month, price: { in_per_mtok_usd: 0.75, out_per_mtok_usd: 3.75, model: env.GEMINI_MODEL } }, 200, origin);
+          return json({ by_user: byUser, by_day: byDay, by_mode: byMode, month,
+            predictions: await predictionStats(env), price: { in_per_mtok_usd: 0.75, out_per_mtok_usd: 3.75, model: env.GEMINI_MODEL } }, 200, origin);
         }
         return json({ error: "not found" }, 404, origin);
       }
@@ -595,6 +632,7 @@ export default {
     if (h >= QUIET_FROM || h < QUIET_TO) return;
     const now = kstStr();
     await runMorningBrief(env, h, now);
+    await scorePredictions(env).catch(() => {}); // 16시 이후, 기한 된 전망 채점 (관리자 적중률)
     const users = (await env.DB.prepare("SELECT * FROM users WHERE push_enabled=1").all()).results;
     for (const u of users) {
       const sentToday = (await env.DB.prepare("SELECT COUNT(*) c FROM push_log WHERE user_id=? AND sent_at >= date('now','+9 hours')").bind(u.id).first()).c;

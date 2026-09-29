@@ -20,7 +20,7 @@ export async function buildBrief(user, env, deps) {
     } catch { return { name: h.name, code: h.code }; }
   }));
 
-  const holdingLines = rows.map((r) => `- ${r.name}${r.pd ? ` 전 거래일(${r.pd.date.slice(5)}) ${r.pd.changeRate > 0 ? "+" : ""}${r.pd.changeRate}%${r.pd.week != null ? `, 5거래일 ${r.pd.week > 0 ? "+" : ""}${r.pd.week}%` : ""}` : ""}${pension && r.group ? ` [${r.group === "100" ? "안전자산" : "위험자산"}]` : ""}`);
+  const holdingLines = rows.map((r) => `- ${r.name}${r.code ? `(${r.code})` : ""}${r.pd ? ` 전 거래일(${r.pd.date.slice(5)}) ${r.pd.changeRate > 0 ? "+" : ""}${r.pd.changeRate}%${r.pd.week != null ? `, 5거래일 ${r.pd.week > 0 ? "+" : ""}${r.pd.week}%` : ""}` : ""}${pension && r.group ? ` [${r.group === "100" ? "안전자산" : "위험자산"}]` : ""}`);
   const eventLines = events.map((e) => `- ${e.at.slice(11)} ${e.title}`);
   const monday = new Date(Date.now() + 9 * 3600e3).getUTCDay() === 1;
 
@@ -45,6 +45,7 @@ export async function buildBrief(user, env, deps) {
     "- 의견은 '참고 의견'이라고 밝히고 결정은 본인 몫이라고 한 줄 덧붙인다.",
     "- 뉴스와 숫자는 확인된 것만 쓴다. 전망은 '우세'와 확신도로만 말하고 단정하지 않는다.",
     "- 검색은 날짜를 박은 일반 검색 대신 '움직인 것 + 원인'(예: '반도체주 하락 이유')으로 한다. 기사 날짜를 확인한다.",
+    "- 맨 끝에 기록용 블록을 붙인다(서버가 떼어 가서 사용자에게 안 보인다. 본문에서 언급하지 않는다). 형식: ```outlook 줄바꿈 [{\"group\":\"묶음 이름\",\"codes\":[\"보유 목록의 그 묶음 종목코드\"],\"view\":\"up|down|flat\",\"confidence\":\"low|mid|high\",\"action\":\"add|hold|reduce\"}] 줄바꿈 ```",
     "- 60대가 읽는다. 어려운 용어는 처음 나올 때 괄호로 푼다. 이모지는 쓰지 않는다.",
     "- 마크다운 소제목(##)과 글머리표를 쓰고 전체 1500자 안쪽.",
     "",
