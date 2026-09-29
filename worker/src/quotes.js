@@ -25,6 +25,22 @@ export async function getQuote(code, env) {
   }
 }
 
+/**
+ * 전 거래일(오늘 이전 가장 최근 거래일) 등락과 5거래일 흐름.
+ * 실시간 시세는 08:00(넥스트레이드 프리마켓)에 오늘 장으로 바뀌며 등락이 0%가 되므로, 아침 브리핑은 이 값을 써야 어제 움직임이 잡힌다.
+ * @returns {{date:string, close:number, changeRate:number, week:number|null}}
+ */
+export async function prevDay(code) {
+  const r = await fetch(`https://m.stock.naver.com/api/stock/${code}/price?pageSize=8&page=1`, { headers: UA });
+  if (!r.ok) throw new Error("naver price " + r.status);
+  const rows = await r.json();
+  const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  const i = rows.findIndex((x) => x.localTradedAt < today);
+  if (i < 0) throw new Error("전 거래일 없음");
+  const close = num(rows[i].closePrice), base = rows[i + 5] ? num(rows[i + 5].closePrice) : null;
+  return { date: rows[i].localTradedAt, close, changeRate: Number(rows[i].fluctuationsRatio), week: base ? Math.round(((close - base) / base) * 1000) / 10 : null };
+}
+
 // KRX Open API: 전 영업일 ETF/주식 일별시세. 승인된 키 필요. (미검증: 키 발급 후 실제 응답으로 필드명 확인 필요)
 async function krxDaily(code, key) {
   const d = new Date(Date.now() + 9 * 3600e3);

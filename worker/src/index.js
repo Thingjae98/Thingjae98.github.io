@@ -1,6 +1,6 @@
 import { chat as geminiChat } from "./gemini.js";
 import { checkPension, riskRatio, pensionRuleText, searchEtf, etfShareLine, etfFee } from "./pension.js";
-import { searchSymbol, getQuote } from "./quotes.js";
+import { searchSymbol, getQuote, prevDay } from "./quotes.js";
 import { sendPush } from "./push.js";
 import { getFinance, getKeyMetrics } from "./finance.js";
 import { analyzeStyle, riskProfile } from "./profile.js";
@@ -37,8 +37,9 @@ async function resolveSymbol(query) {
 
 async function quoteWithPension(query, env, accountType = "pension") {
   const s = await resolveSymbol(query);
-  const q = await getQuote(s.code, env);
-  return { ...q, pension: checkPension({ code: q.code, name: q.name, kind: q.kind, accountType }) };
+  const [q, pd] = await Promise.all([getQuote(s.code, env), prevDay(s.code).catch(() => null)]);
+  // prev_day: 전 거래일 등락·5거래일 흐름 (장 시작 전에는 '오늘' 등락이 0%라 이걸 봐야 한다)
+  return { ...q, prev_day: pd, pension: checkPension({ code: q.code, name: q.name, kind: q.kind, accountType }) };
 }
 
 // 자산 화면 시세는 1분간 재사용한다 (같은 서버 인스턴스 안에서만)
@@ -200,7 +201,8 @@ async function buildSystem(user, env) {
     "- 증권사 앱 캡처나 비중표 이미지를 받으면 종목과 수량 또는 비중(%)을 읽어 set_holding 으로 전부 등록한다. 수량이 없고 비중만 있으면 weight_pct 에 넣는다. 등록 후 무엇을 넣었는지 표로 보여준다.",
     "- 기업 분석·보고서를 요청받으면 get_financials 로 실제 재무 숫자를 먼저 가져온다. 숫자는 가져온 값만 쓰고 추정하지 않는다. 최신 소식은 구글 검색으로 보완한다.",
     "- '이 종목 어때', '안전한가', '오래 들고 갈까 짧게 볼까', '나한테 맞나' 류의 질문에는 my_style 과 risk_profile 을 함께 불러 본인 매매 습관과 종목 성격을 대조해 답한다. 예: '평소 2주쯤 들고 계시는데 이 종목은 변동성이 높아 그 기간에 손실 폭이 커질 수 있습니다.'",
-    "- 주가가 오를지 내릴지는 단정하지 않는다. 증권사 목표주가 컨센서스는 '애널리스트 평균은 이렇다'고 인용만 하고, 맞는다는 보장이 없다고 덧붙인다.",
+    "- 전망 의견을 물으면(또는 원인 분석 끝에) '1~2주 전망: 반등 우세 / 하락 우세 / 횡보', '확신도: 낮음·보통·높음', '행동 의견: 비중 확대 / 유지 / 축소'를 근거와 함께 낸다. '오른다·내린다'로 단정하지 않는다. 확신도가 낮으면 행동 의견은 '유지'로 두고, 하루 등락만 보고 확대·축소를 권하지 않는다. '전망은 참고 의견이며 틀릴 수 있다'를 한 줄 붙인다. 증권사 목표주가는 '애널리스트 평균은 이렇다'고 인용만 한다.",
+    "- '왜 떨어졌나·올랐나', '급락 이유' 질문에는 이 순서로 답한다: ① 사실(get_quote 의 오늘·prev_day 등락, 코스피와 대표 구성 기업 등락, 외국인·기관 매도 규모를 검색으로) ② 원인 2~3개(기사들이 공통으로 드는 것부터) ③ 내 계좌 영향(보유 비중 × 등락) ④ 일시적 요인인지 구조적 요인인지 ⑤ 앞으로 볼 일정 ⑥ 전망 판단. 장 시작 전·주말에는 '오늘' 등락이 0%이니 prev_day 를 쓴다.",
     "- 매매 기록이 적어 성향이 안 나오면 솔직히 말하고, 매매하실 때 말씀해 주시면 쌓인다고 안내한다.",
     "- '보고서로 만들어줘', 'PDF로', '발표자료로', 'PPT로' 같은 요청에는 make_document 를 부른다. 내용을 먼저 조사한 뒤 마지막에 부른다. 답변에는 무엇을 만들었는지 한 줄만 쓴다.",
     "- 여러 종목 비교, 업종 전반 조사, 포트폴리오 전체 점검처럼 시간이 걸리는 요청은 deep_research 에 맡긴다. 맡긴 뒤에는 결과를 지어내지 말고 준비되면 알려드리겠다고만 답한다.",
@@ -293,19 +295,30 @@ async function newSession(u, env) {
 async function deepContext(user, env) {
   const holdings = (await env.DB.prepare("SELECT name, code, qty, weight_pct FROM holdings WHERE user_id=?").bind(user.id).all()).results;
   const memos = (await env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY id DESC LIMIT 20").bind(user.id).all()).results;
-  const detail = [];
-  for (const h of holdings.slice(0, 12)) {
-    if (!h.code) { detail.push(`- ${h.name}`); continue; }
+  // 계좌 기준 비중: 비중 등록은 ETF 부분 비율(etf_share_pct)로 환산, 수량 등록은 적립금 대비 금액으로
+  const knownWeight = holdings.reduce((s, h) => s + (h.weight_pct || 0), 0);
+  const f = user.etf_share_pct != null && knownWeight ? user.etf_share_pct / knownWeight : 1;
+  let impact = 0, impactDate = null, impactKnown = true, sessionNote = "";
+  const detail = await Promise.all(holdings.slice(0, 12).map(async (h) => {
+    if (!h.code) return `- ${h.name}`;
     try {
-      const q = await getQuote(h.code, env);
+      const [q, pd] = await Promise.all([getQuote(h.code, env), prevDay(h.code).catch(() => null)]);
       const pv = checkPension({ code: q.code, name: q.name, kind: q.kind, accountType: user.account_type });
-      detail.push(`- ${q.name}(${q.code}) 현재가 ${q.price?.toLocaleString()}원, 전일대비 ${q.changeRate}%`
-        + (h.qty ? `, ${h.qty}주` : "") + (h.weight_pct ? `, 비중 ${h.weight_pct}%` : "")
-        + (user.account_type === "general" ? "" : `, 퇴직연금 ${pv.verdict}${pv.group ? " " + pv.group + "%" : ""}`));
-    } catch { detail.push(`- ${h.name}${h.weight_pct ? ` 비중 ${h.weight_pct}%` : ""}`); }
-  }
+      const aw = h.weight_pct != null ? h.weight_pct * f : (h.qty && user.total_balance ? (h.qty * q.price * 100) / user.total_balance : null);
+      if (pd && aw != null) { impact += (aw * pd.changeRate) / 100; impactDate = pd.date; } else impactKnown = false;
+      if (q.marketStatus !== "OPEN") sessionNote = "지금은 정규장 시간이 아니라 '오늘 등락'은 의미가 없다. 전 거래일 등락을 기준으로 쓴다.";
+      return `- ${q.name}(${q.code}) 현재가 ${q.price?.toLocaleString()}원, 오늘 ${q.changeRate}%`
+        + (pd ? `, 전 거래일(${pd.date.slice(5)}) ${pd.changeRate > 0 ? "+" : ""}${pd.changeRate}%${pd.week != null ? `, 5거래일 ${pd.week > 0 ? "+" : ""}${pd.week}%` : ""}` : "")
+        + (h.qty ? `, ${h.qty}주` : "") + (aw != null ? `, 계좌 비중 약 ${Math.round(aw * 10) / 10}%` : "")
+        + (user.account_type === "general" ? "" : `, 퇴직연금 ${pv.verdict}${pv.group ? " " + pv.group + "%" : ""}`);
+    } catch { impactKnown = false; return `- ${h.name}${h.weight_pct ? ` 비중 ${h.weight_pct}%` : ""}`; }
+  }));
+  const impactLine = impactDate && impactKnown
+    ? `전 거래일(${impactDate.slice(5)}) 보유 종목 움직임이 계좌 전체에 준 영향: 약 ${impact > 0 ? "+" : ""}${Math.round(impact * 100) / 100}%p (계좌 비중 × 등락으로 서버가 계산)` : "";
   return [
+    `오늘: ${kstStr()} (${"일월화수목금토"[kst().getUTCDay()]}요일)`,
     detail.length ? "보유 종목 (서버에서 방금 조회한 확정 수치):\n" + detail.join("\n") : "",
+    impactLine, sessionNote,
     etfShareLine(user),
     marketLines(kstStr().slice(0, 10)),
     user.total_balance ? `계좌 총액: ${user.total_balance.toLocaleString()}원` : "",
