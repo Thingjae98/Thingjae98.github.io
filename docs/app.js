@@ -1,6 +1,13 @@
 /* 가족 비서 — 화면 로직 (vanilla) */
 (() => {
   const API = window.FA_API;
+  // 서버가 알려주는 최소 버전보다 오래됐으면 새로고침한다 (앱을 켜 둔 채로 며칠 쓰면 옛 화면이 남는다)
+  const APP_VERSION = "20260929c";
+  function checkVersion(m) {
+    if (!m?.min_app || APP_VERSION >= m.min_app) return;
+    try { if (sessionStorage.getItem("fa_reloaded") === m.min_app) return; sessionStorage.setItem("fa_reloaded", m.min_app); } catch {}
+    location.reload();
+  }
   const $ = (s) => document.querySelector(s);
   const store = {
     get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -104,6 +111,7 @@
 
   async function enter() {
     me = await api("GET", "/me");
+    checkVersion(me);
     $("#lock").hidden = true; $("#app").hidden = false;
     buildNav();
     applyMe();
@@ -297,6 +305,15 @@
     const label = p.verdict === "가능" ? (p.group === "100" ? "퇴직연금 100%" : "퇴직연금 70%") : p.verdict;
     return `<span class="badge ${cls}">${label}</span>`;
   };
+  // 자산 탭 위쪽 전환: 보유 현황 | 매매일지 (마지막으로 본 쪽 기억)
+  function setAssetsTab(t) {
+    document.querySelectorAll("[data-assets-tab]").forEach((b) => b.setAttribute("aria-selected", b.dataset.assetsTab === t ? "true" : "false"));
+    $("#assets-holdings").hidden = t !== "holdings"; $("#assets-trades").hidden = t !== "trades";
+    store.set("fa_assets_tab", t);
+  }
+  document.querySelectorAll("[data-assets-tab]").forEach((b) => b.addEventListener("click", () => { setAssetsTab(b.dataset.assetsTab); $("#main").scrollTop = 0; }));
+  setAssetsTab(store.get("fa_assets_tab") === "trades" ? "trades" : "holdings");
+
   async function loadAssets() {
     const general = me.account_type === "general";
     const tradesReq = api("GET", "/trades"); // 보유 종목과 동시에 부른다
@@ -527,7 +544,9 @@
   function urlB64ToU8(s) { const b = atob((s + "=".repeat((4 - (s.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(b, (c) => c.charCodeAt(0)); }
   // 앱을 다시 열면(백그라운드→화면) 그사이 도착한 브리핑·답이 보이게 대화를 다시 불러온다
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState !== "visible" || !me || $("#view-chat").hidden) return;
+    if (document.visibilityState !== "visible" || !me) return;
+    api("GET", "/me").then(checkVersion).catch(() => {}); // 다시 열 때 새 버전이 나왔으면 새로고침
+    if ($("#view-chat").hidden) return;
     watching.clear(); chatLoaded = false; loadChat().catch(() => {});
   });
   function registerSW() { if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {}); }

@@ -13,6 +13,8 @@ const logError = (env, userId, place, message) =>
   env.DB.prepare("INSERT INTO app_errors (user_id, place, message) VALUES (?,?,?)").bind(userId ?? null, place, String(message || "").slice(0, 300)).run().catch(() => {});
 
 const QUIET_FROM = 22, QUIET_TO = 7, DAILY_PUSH_CAP = 10, SESSION_DAYS = 30;
+// 이 버전보다 오래된 화면(app.js)은 스스로 새로고침한다. 화면과 서버 규칙이 함께 바뀔 때 올린다 (docs/app.js 의 APP_VERSION 과 맞춘다)
+const MIN_APP = "20260929c";
 
 // ---------- 공통 ----------
 const kst = (d = new Date()) => new Date(d.getTime() + 9 * 3600e3);
@@ -204,6 +206,10 @@ async function buildSystem(user, env) {
     "  · 수량이 있는 종목: 남은 수량으로 바꾼다(매수는 더하고 매도는 뺀다). 다 팔았으면 qty 0 으로 지운다.",
     "  · '수량 모름'(비중만 있는) 종목: 판 비율만큼 비중을 줄인다(절반이면 7% → 3.5%, 전부면 qty 0 으로 지운다). 새로 산 종목은 수량으로 등록한다.",
     "  · 가격을 말하지 않았으면 되묻지 말고 get_quote 의 현재가로 add_trade 에 기록하고, 답에 '체결가를 몰라 현재가로 적었습니다. 다르면 알려주세요'를 한 줄 붙인다.",
+    "  · 수량 없이 '팔았다'고만 하면(일부·절반 같은 말이 없으면) 전량 매도로 보고 먼저 반영한다: 수량이 있는 종목은 그 수량 전부를 현재가로 일지에 적고 qty 0 으로 지운다. 수량 모름이면 qty 0 으로 지우고, 수량을 몰라 일지는 못 적었다고 말한다. 답에 '전량 매도로 반영했습니다. 일부만 파셨으면 알려주세요'를 붙인다.",
+    "  · 수량·비중 없이 '샀다'고만 하면 그 종목만 수량을 묻는다. 같은 말에 판 종목이 있으면 판 쪽은 먼저 반영한다. 되묻기만 하고 아무것도 반영하지 않는 일이 없게 한다.",
+    "  · 답 끝에 '반영한 것: … / 아직 못 한 것: …'을 한 줄씩 분명히 쓴다.",
+    "  · 예시: '오늘 SOL AI반도체 소부장을 팔고, KODEX건설을 매수했어' → 되묻기 전에 먼저 set_holding(query='SOL AI반도체소부장', qty=0) 을 호출해 지운다. 그다음 'SOL AI반도체소부장은 전량 매도로 반영했습니다(일부만 파셨으면 알려주세요). KODEX 건설은 몇 주 사셨는지 알려주시면 반영하겠습니다.' 라고 답한다.",
     "  · 수량을 모르면(예: '절반 팔았어') 적립금과 비중을 알면 수량을 계산해 기록하고 '계산한 수량'이라고 밝힌다. 계산할 수 없으면 매매일지는 건너뛰고 보유 비중만 바꾼 뒤, 수량을 알려주시면 일지에 적겠다고 한다.",
     "- 사용자가 투자 원칙·선호·관심사를 말하면 save_memory 로 저장한다.",
     "- 일정을 말하면 add_event 로 저장하고 알림 시각을 확인해 준다.",
@@ -293,7 +299,7 @@ async function deliverBrief(u, text, short, env) {
   if (subs.length) await env.DB.prepare("INSERT INTO push_log (user_id, title, sent_at) VALUES (?,?,datetime('now','+9 hours'))").bind(u.id, "아침 브리핑").run();
 }
 
-const pub = (u) => ({ id: u.id, handle: u.handle, name: u.name, agent_name: u.agent_name, honorific: u.honorific, tone: u.tone, push_enabled: !!u.push_enabled, total_balance: u.total_balance, is_admin: !!u.is_admin, account_type: u.account_type || 'pension', brief_enabled: !!u.brief_enabled, brief_hour: u.brief_hour ?? 8, chat_mode: u.chat_mode || 'smart' });
+const pub = (u) => ({ id: u.id, handle: u.handle, name: u.name, agent_name: u.agent_name, honorific: u.honorific, tone: u.tone, push_enabled: !!u.push_enabled, total_balance: u.total_balance, is_admin: !!u.is_admin, account_type: u.account_type || 'pension', brief_enabled: !!u.brief_enabled, brief_hour: u.brief_hour ?? 8, chat_mode: u.chat_mode || 'smart', min_app: MIN_APP });
 
 async function newSession(u, env) {
   const token = hex(crypto.getRandomValues(new Uint8Array(32)));

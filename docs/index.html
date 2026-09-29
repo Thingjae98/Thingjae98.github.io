@@ -14,7 +14,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-  <link rel="stylesheet" href="styles.css?v=20260929b">
+  <link rel="stylesheet" href="styles.css?v=20260929c">
   <script src="config.js"></script>
 </head>
 <body>
@@ -99,6 +99,11 @@
 
       <!-- 자산 -->
       <section id="view-assets" class="view" data-view="assets" hidden>
+        <div class="seg" role="tablist" aria-label="자산 화면">
+          <button type="button" role="tab" class="seg-btn" data-assets-tab="holdings" aria-selected="true">보유 현황</button>
+          <button type="button" role="tab" class="seg-btn" data-assets-tab="trades" aria-selected="false">매매일지</button>
+        </div>
+        <div id="assets-holdings" class="stack">
         <div class="panel">
           <div class="panel-head">
             <h2 id="risk-panel-title">위험자산 비중</h2>
@@ -136,9 +141,13 @@
           <p class="hint">증권사 앱의 퇴직연금 잔고 화면(예금 포함)을 캡처해 올리면, 읽은 목록을 먼저 보여드리고 확인하시면 보유 종목 전체를 그대로 바꿉니다. 종목 하나만 고칠 때는 그 종목의 [수정]을 누르세요.</p>
         </div>
 
+        </div>
+        <div id="assets-trades" class="stack" hidden>
         <div class="panel">
           <div class="panel-head"><h2>매매일지</h2></div>
           <div id="trades-list" class="list"></div>
+          <p class="hint">대화에서 "오늘 SOL 반도체 100주 18,500원에 팔았어"처럼 말씀하시면 여기 기록되고 보유 종목도 함께 바뀝니다. 가격을 말하지 않으면 그때 현재가로 적습니다.</p>
+        </div>
         </div>
       </section>
 
@@ -318,6 +327,6 @@
   </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
-  <script src="app.js?v=20260929b"></script>
+  <script src="app.js?v=20260929c"></script>
 </body>
 </html>

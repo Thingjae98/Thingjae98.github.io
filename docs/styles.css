@@ -99,6 +99,10 @@ img { max-width: 100%; display: block; }
 .grow { flex: 1; }
 .inline-form { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
 .stack { display: flex; flex-direction: column; gap: 14px; }
+/* 자산 탭 위쪽 전환 (보유 현황 | 매매일지) */
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--panel-2); border-radius: 999px; }
+.seg-btn { min-height: 48px; border: 0; border-radius: 999px; background: transparent; color: var(--ink-2); font: inherit; font-weight: 700; cursor: pointer; touch-action: manipulation; }
+.seg-btn[aria-selected="true"] { background: var(--bg); color: var(--ink); box-shadow: 0 1px 3px oklch(0 0 0 / 0.12); }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .error { color: var(--no); font-weight: 600; }
 .hint { color: var(--ink-2); font-size: 0.89rem; margin-top: 10px; }
