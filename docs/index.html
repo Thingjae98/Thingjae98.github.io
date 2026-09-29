@@ -14,7 +14,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-  <link rel="stylesheet" href="styles.css?v=20260929a">
+  <link rel="stylesheet" href="styles.css?v=20260929b">
   <script src="config.js"></script>
 </head>
 <body>
@@ -129,10 +129,11 @@
           <div class="btn-row" style="margin-top:14px">
             <label class="btn secondary" style="cursor:pointer">
               <input id="holdings-image" type="file" accept="image/*" hidden>
-              보유 종목 사진으로 한번에 넣기
+              보유 종목 사진으로 바꾸기
             </label>
+            <button id="holding-add" class="btn ghost" type="button">종목 하나 추가</button>
           </div>
-          <p class="hint">증권사 앱의 보유 목록이나 비중 표를 찍어 올리면 한 번에 등록합니다. 대화에서 "SOL 반도체 100주 보유"처럼 말해도 됩니다.</p>
+          <p class="hint">증권사 앱의 퇴직연금 잔고 화면(예금 포함)을 캡처해 올리면, 읽은 목록을 먼저 보여드리고 확인하시면 보유 종목 전체를 그대로 바꿉니다. 종목 하나만 고칠 때는 그 종목의 [수정]을 누르세요.</p>
         </div>
 
         <div class="panel">
@@ -296,7 +297,27 @@
     <article id="doc-body" class="doc-body"></article>
   </dialog>
 
+  <!-- 사진으로 읽은 보유 종목 확인 -->
+  <dialog id="photo-dialog" class="doc-dialog" aria-label="사진으로 읽은 보유 종목">
+    <div class="doc-bar"><button id="photo-cancel" class="btn ghost small" type="button">취소</button><button id="photo-apply" class="btn primary small" type="button">이대로 바꾸기</button></div>
+    <div id="photo-body" class="doc-body"></div>
+  </dialog>
+
+  <!-- 종목 하나 추가·수정 -->
+  <dialog id="holding-dialog" class="doc-dialog" aria-label="보유 종목 추가·수정">
+    <form id="holding-form" class="doc-body stack" method="dialog">
+      <h2 id="holding-title">종목 추가</h2>
+      <label class="field"><span>종목 이름</span><input id="hd-query" type="text" placeholder="예: SOL AI반도체TOP2플러스" required></label>
+      <div class="row2">
+        <label class="field"><span>수량(주)</span><input id="hd-qty" type="text" inputmode="numeric" placeholder="예: 650"></label>
+        <label class="field"><span>또는 비중(%)</span><input id="hd-weight" type="text" inputmode="decimal" placeholder="예: 18"></label>
+      </div>
+      <p class="hint">수량을 알면 수량만 넣으세요. 수량을 모르면 비중만 넣어도 됩니다.</p>
+      <div class="btn-row"><button id="hd-cancel" class="btn ghost" type="button">취소</button><button class="btn primary" type="submit">저장</button></div>
+    </form>
+  </dialog>
+
   <script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
-  <script src="app.js?v=20260929a"></script>
+  <script src="app.js?v=20260929b"></script>
 </body>
 </html>

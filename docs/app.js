@@ -274,11 +274,12 @@
       addMsg("model", `죄송합니다, 답을 가져오지 못했습니다. (${ex.message}) 잠시 후 다시 말씀해 주세요.`);
     } finally { busy($("#chat-send"), false); input.focus(); }
   });
-  function shrinkImage(file) {
+  function shrinkImage(file, max = 1400) {
     return new Promise((res, rej) => {
       const img = new Image();
       img.onload = () => {
-        const max = 1400, s = Math.min(1, max / Math.max(img.width, img.height));
+        // 잔고 화면 캡처는 세로로 길어서 긴 변 기준으로 너무 줄이면 글자가 뭉개진다 (보유 종목 사진은 2000)
+        const s = Math.min(1, max / Math.max(img.width, img.height));
         const c = document.createElement("canvas"); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
         c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
         const url = c.toDataURL("image/jpeg", 0.85);
@@ -332,6 +333,7 @@
       const detail = [h.qty ? `${fmt(h.qty)}주` : null, h.avg_price ? `평단 ${fmt(h.avg_price)}원` : null, share ? `비중 ${share}` : null, h.fee_pct != null ? `총보수 ${h.fee_pct}%` : null].filter(Boolean).join(" · ") || "수량 미입력";
       return `<div class="item"><div class="item-main"><div class="item-title">${esc(h.name)}</div><div class="item-sub">${detail}</div></div>
         <div class="item-num">${h.value != null ? `<div>${fmt(h.value)}원</div>` : (h.price ? `<div class="item-sub">${fmt(h.price)}원</div>` : "")}${pl != null ? `<div class="item-sub ${pl >= 0 ? "up" : "down"}">${pl >= 0 ? "+" : ""}${pl.toFixed(1)}%</div>` : ""}</div>
+        <button class="btn ghost small" type="button" data-edit-holding="${h.id}" data-name="${esc(h.name)}" data-qty="${h.qty ?? ""}" data-weight="${h.weight_pct ?? ""}">수정</button>
         <button class="del" type="button" data-del-holding="${h.id}" aria-label="${esc(h.name)} 삭제"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>`;
     }).join("") : `<div class="empty-row">아직 등록된 종목이 없습니다.</div>`;
     $("#holdings-updated").textContent = d.holdings.length ? "현재가 기준" : "";
@@ -356,22 +358,68 @@
     } catch (ex) { toast(ex.message); }
   });
 
+  // 보유 종목 사진: 먼저 읽기만 해서 "이렇게 읽었습니다"를 보여주고, 확인하면 전체를 교체한다
+  const reportError = (place, message) => api("POST", "/errors", { place, message: String(message).slice(0, 300) }).catch(() => {});
+  let photoPreview = null;
   $("#holdings-image").addEventListener("change", async (e) => {
     const f = e.target.files[0]; e.target.value = "";
     if (!f) return;
     let img;
-    try { img = await shrinkImage(f); } catch { return toast("사진을 읽지 못했습니다."); }
+    try { img = await shrinkImage(f, 2000); } catch (ex) { reportError("photo-client", `사진 줄이기 실패: ${f.type} ${f.size}B ${ex?.message || ""}`); return toast("사진을 열지 못했습니다. 증권사 앱 화면을 캡처(스크린샷)해서 올려 주세요.", 8000); }
     toast("사진을 읽고 있습니다. 잠시만 기다려 주세요.", 30000);
     e.target.disabled = true; // 읽는 동안 두 번 올리지 않게
     try {
-      const r = await api("POST", "/chat", {
-        text: "이 사진은 제 보유 종목 목록입니다. 종목명과 수량 또는 비중(%)을 읽어서 set_holding 으로 전부 등록해 주세요. 수량이 없고 비중만 적혀 있으면 weight_pct 에 그 값을 넣으세요. 등록한 내용을 한 줄로만 알려주세요.",
-        image: { mimeType: img.mimeType, data: img.data },
-        keep_log: false,
-      });
-      toast(r.reply ? r.reply.replace(/[#*|]/g, "").slice(0, 90) : "등록했습니다.", 12000);
+      photoPreview = await api("POST", "/holdings/read-photo", { image: { mimeType: img.mimeType, data: img.data } });
+      $("#toast").hidden = true;
+      showPhotoPreview(photoPreview);
+    } catch (ex) { if (!/인터넷/.test(ex.message)) reportError("photo-client", ex.message); toast(ex.message, 8000); } finally { e.target.disabled = false; }
+  });
+  function showPhotoPreview(r) {
+    const ok = r.items.filter((x) => x.matched && (x.qty || x.weight_pct || x.value));
+    const GROUP = { "100": "안전자산", "70": "위험자산", "0": "퇴직연금 불가" };
+    const amount = (x) => [x.qty ? `${fmt(x.qty)}주` : null, x.value ? `${fmt(x.value)}원` : null, !x.qty && x.weight_pct ? `비중 ${x.weight_pct}%` : null].filter(Boolean).join(" · ");
+    $("#photo-body").innerHTML = `
+      <h2>사진에서 이렇게 읽었습니다</h2>
+      <p class="hint">[이대로 바꾸기]를 누르면 지금 등록된 보유 종목은 모두 지워지고 아래 ${ok.length}개 종목으로 바뀝니다. 틀린 곳이 있으면 [취소]하고 다시 찍어 주세요.</p>
+      <div class="list">${r.items.map((x) => `<div class="item"><div class="item-main"><div class="item-title">${esc(x.name)}${x.group && GROUP[x.group] ? ` <span class="badge ${x.group === "100" ? "ok" : x.group === "0" ? "no" : "warn"}">${GROUP[x.group]}</span>` : ""}</div>
+        <div class="item-sub">${x.matched ? esc(amount(x) || "수량·비중을 못 읽음 (빠집니다)") : `종목을 찾지 못함: '${esc(x.read)}' (빠집니다)`}</div></div></div>`).join("")}
+        ${r.cash.map((c) => `<div class="item"><div class="item-main"><div class="item-title">${esc(c.name)} <span class="badge ok">예금·현금</span></div><div class="item-sub">${fmt(c.value)}원 (보유 종목이 아니라 안전자산으로 계산)</div></div></div>`).join("")}
+      </div>
+      <p class="meter-text" style="margin-top:14px">${r.total_value ? `평가금액 합계 ${fmt(r.total_value)}원을 적립금으로 저장하고, 비중은 계좌 전체 기준으로 계산합니다.` : "합계 금액이 사진에 없어 비중만 반영합니다. 적립금·ETF 비율은 지금 값을 그대로 씁니다."}</p>`;
+    $("#photo-apply").disabled = !ok.length;
+    $("#photo-dialog").showModal();
+  }
+  $("#photo-cancel").addEventListener("click", () => $("#photo-dialog").close());
+  $("#photo-apply").addEventListener("click", async (e) => {
+    busy(e.currentTarget, true);
+    try {
+      const items = photoPreview.items.filter((x) => x.matched).map((x) => ({ code: x.code, name: x.name, qty: x.qty, weight_pct: x.weight_pct, value: x.value }));
+      const r = await api("POST", "/holdings/replace", { items, total_value: photoPreview.total_value });
+      $("#photo-dialog").close();
+      toast(`보유 종목 ${r.count}개로 바꿨습니다.`, 6000);
       loadAssets();
-    } catch (ex) { toast(ex.message); } finally { e.target.disabled = false; }
+    } catch (ex) { toast(ex.message, 8000); } finally { busy(e.currentTarget, false); }
+  });
+
+  // 종목 하나 추가·수정
+  let editingId = null;
+  function openHolding(h) {
+    editingId = h?.id || null;
+    $("#holding-title").textContent = editingId ? "보유 종목 수정" : "종목 하나 추가";
+    $("#hd-query").value = h?.name || ""; $("#hd-query").readOnly = !!editingId;
+    $("#hd-qty").value = h?.qty || ""; $("#hd-weight").value = h?.weight || "";
+    $("#holding-dialog").showModal();
+  }
+  $("#holding-add").addEventListener("click", () => openHolding(null));
+  $("#hd-cancel").addEventListener("click", () => $("#holding-dialog").close());
+  $("#holding-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const qty = $("#hd-qty").value.replace(/[^\d]/g, ""), weight_pct = $("#hd-weight").value.replace(/[^\d.]/g, "");
+    try {
+      if (editingId) await api("PUT", "/holdings/" + editingId, { qty, weight_pct });
+      else { const r = await api("POST", "/holdings", { query: $("#hd-query").value, qty, weight_pct }); toast(`${r.name}(으)로 저장했습니다.`); }
+      $("#holding-dialog").close(); loadAssets();
+    } catch (ex) { toast(ex.message, 6000); }
   });
   $("#balance-form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -382,6 +430,8 @@
   $("#balance-input").addEventListener("input", (e) => { const n = e.target.value.replace(/[^\d]/g, ""); e.target.value = n ? Number(n).toLocaleString("ko-KR") : ""; });
   document.addEventListener("click", async (e) => {
     const h = e.target.closest("[data-del-holding]"), t = e.target.closest("[data-del-trade]"), ev = e.target.closest("[data-del-event]"), m = e.target.closest("[data-del-memory]");
+    const ed = e.target.closest("[data-edit-holding]");
+    if (ed) return openHolding({ id: ed.dataset.editHolding, name: ed.dataset.name, qty: ed.dataset.qty, weight: ed.dataset.weight });
     try {
       if (h && confirm("이 종목을 목록에서 지울까요?")) { await api("DELETE", "/holdings/" + h.dataset.delHolding); loadAssets(); }
       if (t && confirm("이 매매 기록을 지울까요?")) { await api("DELETE", "/trades/" + t.dataset.delTrade); loadAssets(); }
@@ -501,6 +551,8 @@
         }),
         row(!(s.jobs.failed7 > 0), "깊게 작업", `대기·진행 ${s.jobs.waiting || 0}건 · 오늘 ${s.jobs.deep_today || 0}건 · 최근 7일 실패 ${s.jobs.failed7 || 0}건`),
         row(s.etf_rules >= 1000, "ETF 판정표", `${fmt(s.etf_rules)}종 (매주 월 07시 이 PC가 자동 갱신)`),
+        row(!(s.errors || []).length, "최근 7일 오류", (s.errors || []).length ? "" : "없음"),
+        ...(s.errors || []).map((er) => `<div class="item"><div class="item-main"><div class="item-sub">${esc(er.created_at.slice(5, 16))} · ${esc(er.name || "-")} · ${esc(er.place)}<br>${esc(er.message)}</div></div></div>`),
       ].join("");
     } catch (ex) { $("#status-body").innerHTML = row(false, "상태 조회", ex.message); }
   }

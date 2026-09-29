@@ -7,6 +7,10 @@ import { analyzeStyle, riskProfile } from "./profile.js";
 import { buildBrief, NO_HOLDINGS_NOTE } from "./brief.js";
 import { upcomingMarket, marketLines } from "./market_calendar.js";
 import { extractOutlook, savePredictions, scorePredictions, predictionStats } from "./predictions.js";
+import { readHoldingsPhoto } from "./holdings_photo.js";
+
+const logError = (env, userId, place, message) =>
+  env.DB.prepare("INSERT INTO app_errors (user_id, place, message) VALUES (?,?,?)").bind(userId ?? null, place, String(message || "").slice(0, 300)).run().catch(() => {});
 
 const QUIET_FROM = 22, QUIET_TO = 7, DAILY_PUSH_CAP = 10, SESSION_DAYS = 30;
 
@@ -199,7 +203,7 @@ async function buildSystem(user, env) {
     "- 사용자가 매수·매도했다고 말하면 add_trade 로 기록하고, 이유·목표가·손절선을 한 번만 가볍게 묻는다(강요하지 않는다). 보유 수량도 set_holding 으로 맞춘다.",
     "- 사용자가 투자 원칙·선호·관심사를 말하면 save_memory 로 저장한다.",
     "- 일정을 말하면 add_event 로 저장하고 알림 시각을 확인해 준다.",
-    "- 증권사 앱 캡처나 비중표 이미지를 받으면 종목과 수량 또는 비중(%)을 읽어 set_holding 으로 전부 등록한다. 수량이 없고 비중만 있으면 weight_pct 에 넣는다. 등록 후 무엇을 넣었는지 표로 보여준다.",
+    "- 보유 종목 전체가 담긴 잔고 캡처나 비중표를 받으면 set_holding 으로 등록하지 않는다(사진에 없는 옛 종목이 남는다). 대신 무엇이 보이는지 표로 정리해 주고, '자산 탭의 [보유 종목 사진으로 바꾸기]에 같은 사진을 올리시면 확인 후 전체가 한 번에 바뀝니다'라고 안내한다. 종목 한두 개를 말로 알려주면(예: 'SOL 반도체 100주 보유') 그것만 set_holding 으로 반영한다.",
     "- 기업 분석·보고서를 요청받으면 get_financials 로 실제 재무 숫자를 먼저 가져온다. 숫자는 가져온 값만 쓰고 추정하지 않는다. 최신 소식은 구글 검색으로 보완한다.",
     "- '이 종목 어때', '안전한가', '오래 들고 갈까 짧게 볼까', '나한테 맞나' 류의 질문에는 my_style 과 risk_profile 을 함께 불러 본인 매매 습관과 종목 성격을 대조해 답한다. 예: '평소 2주쯤 들고 계시는데 이 종목은 변동성이 높아 그 기간에 손실 폭이 커질 수 있습니다.'",
     "- 전망 의견을 물으면(또는 원인 분석 끝에) '1~2주 전망: 반등 우세 / 하락 우세 / 횡보', '확신도: 낮음·보통·높음', '행동 의견: 비중 확대 / 유지 / 축소'를 근거와 함께 낸다. '오른다·내린다'로 단정하지 않는다. 확신도가 낮으면 행동 의견은 '유지'로 두고, 하루 등락만 보고 확대·축소를 권하지 않는다. '전망은 참고 의견이며 틀릴 수 있다'를 한 줄 붙인다. 증권사 목표주가는 '애널리스트 평균은 이렇다'고 인용만 한다.",
@@ -508,6 +512,57 @@ export default {
       if (p === "/messages" && req.method === "DELETE") { await db.prepare("DELETE FROM messages WHERE user_id=?").bind(user.id).run(); return json({ ok: true }, 200, origin); }
 
       if (p === "/holdings" && req.method === "GET") return json(await holdingsWithPrices(user, env), 200, origin);
+      // 사진 읽기(저장 안 함): 화면이 "이렇게 읽었습니다"를 보여준 뒤 사용자가 확인하면 /holdings/replace
+      if (p === "/holdings/read-photo" && req.method === "POST") {
+        if (!body.image?.data) return json({ error: "사진이 없습니다" }, 400, origin);
+        try {
+          const r = await readHoldingsPhoto(body.image, user, env);
+          await db.prepare("INSERT INTO usage_log (user_id, in_tokens, out_tokens, mode, created_at) VALUES (?,?,?,'photo',datetime('now','+9 hours'))").bind(user.id, r.usage.in, r.usage.out).run();
+          return json(r, 200, origin);
+        } catch (e) {
+          await logError(env, user.id, "photo-read", e.message || e); // 원문은 관리 기록에만
+          const msg = String(e.message || e);
+          return json({ error: msg.startsWith("사진 읽기 실패") ? "사진을 읽지 못했습니다. 증권사 앱 잔고 화면을 캡처(스크린샷)해서 다시 올려 주세요." : msg }, 422, origin);
+        }
+      }
+      // 전체 교체: 사진에 없는 종목은 지운다. 합계(예금 포함)가 있으면 계좌 기준으로 저장하고 적립금도 맞춘다
+      if (p === "/holdings/replace" && req.method === "POST") {
+        const items = (body.items || []).filter((x) => /^[0-9A-Z]{6}$/.test(x.code || "")).slice(0, 30);
+        if (!items.length) return json({ error: "바꿀 종목이 없습니다" }, 400, origin);
+        const total = Number(body.total_value) > 0 ? Math.round(Number(body.total_value)) : null;
+        const rows = items.map((x) => {
+          const qty = Number(x.qty) > 0 ? Math.round(Number(x.qty)) : null;
+          const w = qty ? null : total && Number(x.value) > 0 ? Math.round((Number(x.value) / total) * 1000) / 10 : Number(x.weight_pct) > 0 ? Number(x.weight_pct) : null;
+          return { code: x.code, name: String(x.name || x.code).slice(0, 60), qty, w };
+        }).filter((x) => x.qty || x.w);
+        if (!rows.length) return json({ error: "수량이나 비중을 읽은 종목이 없습니다" }, 400, origin);
+        await db.batch([
+          db.prepare("DELETE FROM holdings WHERE user_id=?").bind(user.id),
+          ...rows.map((x) => db.prepare("INSERT INTO holdings (user_id, code, name, qty, weight_pct, updated_at) VALUES (?,?,?,?,?,datetime('now','+9 hours'))").bind(user.id, x.code, x.name, x.qty, x.w)),
+          // 합계를 알면 비중은 계좌 기준이므로 'ETF 부분 비율' 조절 값은 필요 없다
+          ...(total ? [db.prepare("UPDATE users SET total_balance=?, etf_share_pct=NULL WHERE id=?").bind(total, user.id)] : []),
+        ]);
+        return json({ ok: true, count: rows.length, total_value: total }, 200, origin);
+      }
+      // 종목 하나 추가(이름으로 찾기) / 수정(수량·비중을 그대로 바꾼다)
+      if (p === "/holdings" && req.method === "POST") {
+        const qty = Number(body.qty) > 0 ? Math.round(Number(body.qty)) : null, w = Number(body.weight_pct) > 0 ? Number(body.weight_pct) : null;
+        if (!qty && !w) return json({ error: "수량이나 비중(%) 중 하나를 넣어주세요" }, 400, origin);
+        const s = await resolveSymbol(String(body.query || "").trim());
+        const name = s.name || (await getQuote(s.code, env).catch(() => ({ name: body.query }))).name;
+        const ex = await db.prepare("SELECT id FROM holdings WHERE user_id=? AND code=?").bind(user.id, s.code).first();
+        if (ex) await db.prepare("UPDATE holdings SET qty=?, weight_pct=?, updated_at=datetime('now','+9 hours') WHERE id=?").bind(qty, w, ex.id).run();
+        else await db.prepare("INSERT INTO holdings (user_id, code, name, qty, weight_pct, updated_at) VALUES (?,?,?,?,?,datetime('now','+9 hours'))").bind(user.id, s.code, name, qty, w).run();
+        return json({ ok: true, name, code: s.code }, 200, origin);
+      }
+      if (p.startsWith("/holdings/") && req.method === "PUT") {
+        const qty = Number(body.qty) > 0 ? Math.round(Number(body.qty)) : null, w = Number(body.weight_pct) > 0 ? Number(body.weight_pct) : null;
+        if (!qty && !w) return json({ error: "수량이나 비중(%) 중 하나를 넣어주세요" }, 400, origin);
+        await db.prepare("UPDATE holdings SET qty=?, weight_pct=?, updated_at=datetime('now','+9 hours') WHERE id=? AND user_id=?").bind(qty, w, idOf("/holdings/"), user.id).run();
+        return json({ ok: true }, 200, origin);
+      }
+      // 화면에서 난 오류(사진 줄이기 실패 등)를 남긴다. 관리 탭 상태 점검에 보인다
+      if (p === "/errors" && req.method === "POST") { await logError(env, user.id, String(body.place || "client").slice(0, 30), body.message); return json({ ok: true }, 200, origin); }
       if (p.startsWith("/holdings/") && req.method === "DELETE") { await db.prepare("DELETE FROM holdings WHERE id=? AND user_id=?").bind(idOf("/holdings/"), user.id).run(); return json({ ok: true }, 200, origin); }
       if (p === "/trades" && req.method === "GET") return json({ trades: (await db.prepare("SELECT * FROM trades WHERE user_id=? ORDER BY trade_date DESC, id DESC LIMIT 200").bind(user.id).all()).results }, 200, origin);
       if (p.startsWith("/trades/") && req.method === "DELETE") { await db.prepare("DELETE FROM trades WHERE id=? AND user_id=?").bind(idOf("/trades/"), user.id).run(); return json({ ok: true }, 200, origin); }
@@ -578,7 +633,8 @@ export default {
               SUM(status='failed' AND created_at >= datetime('now','+9 hours','-7 days')) AS failed7,
               SUM(kind IS NULL AND created_at >= ?) AS deep_today
              FROM jobs`).bind(today).first();
-          return json({ now: kstStr(), bridge_seconds_ago: bridgeAgo, quote, briefs, jobs, etf_rules: searchEtf({ limit: 1 }).total }, 200, origin);
+          const errors = (await db.prepare("SELECT e.created_at, e.place, e.message, u.name FROM app_errors e LEFT JOIN users u ON u.id=e.user_id WHERE e.created_at >= datetime('now','+9 hours','-7 days') ORDER BY e.id DESC LIMIT 5").all()).results;
+          return json({ now: kstStr(), bridge_seconds_ago: bridgeAgo, quote, briefs, jobs, errors, etf_rules: searchEtf({ limit: 1 }).total }, 200, origin);
         }
         if (p === "/admin/usage" && req.method === "GET") {
           const byUser = (await db.prepare(
